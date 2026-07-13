@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/data/models/account_model.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 
 class AccountCard extends StatelessWidget {
-
   final AccountModel account;
   final VoidCallback onTap;
 
-  const AccountCard({
-    super.key,
-    required this.account,
-    required this.onTap,
-  });
+  const AccountCard({super.key, required this.account, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -29,7 +24,6 @@ class AccountCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             Text(
               account.accountType,
               style: TextStyle(
@@ -40,18 +34,17 @@ class AccountCard extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            Text(
-              account.accountNumber,
-            ),
+            Text(account.accountNumber),
             const SizedBox(height: 10),
             Text(
-              "₹ ${account.availableBalance.toStringAsFixed(2)}",
+              CurrencyFormatter.format(
+                account.availableBalance,
+                account.currencyCode,
+              ),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
-                color: account.availableBalance < 0
-                    ? Colors.red
-                    : Colors.green,
+                color: account.availableBalance < 0 ? Colors.red : Colors.green,
               ),
             ),
           ],
