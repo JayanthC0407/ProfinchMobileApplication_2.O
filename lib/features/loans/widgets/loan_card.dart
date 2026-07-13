@@ -114,7 +114,9 @@ class LoanCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        "ID: ${loan.id.substring(loan.id.length > 8 ? loan.id.length - 8 : 0)}",
+                        loan.displayId.isNotEmpty
+                            ? "ID: ${loan.displayId}"
+                            : "ID: ${loan.id.substring(loan.id.length > 8 ? loan.id.length - 8 : 0)}",
                         style: TextStyle(
                           fontSize: AppFontSize.small(context),
                           color: Colors.grey.shade400,
@@ -155,7 +157,8 @@ class LoanCard extends StatelessWidget {
                 Expanded(
                   child: _InfoChip(
                     label: "EMI / Month",
-                    value: "₹${loan.emiAmount.toStringAsFixed(0)}",
+                    value:
+                        "${loan.emiIsEstimated ? '~' : ''}₹${loan.emiAmount.toStringAsFixed(0)}",
                     valueColor: Colors.blue.shade700,
                   ),
                 ),

@@ -12,7 +12,10 @@ class LoanRepository {
   Future<List<LoanModel>> getLoanBalanceOverview({required String userId}) async {
     final response = await ApiClient.instance.get(ApiEndpoints.loanList);
 
-    final rawList = response['loans'] ?? response['data'] ?? [];
+    // Confirmed real response shape wraps the list under "accounts" (same
+    // key name as the demandDeposit endpoint) — NOT "loans", which was
+    // the earlier guess and would have silently returned an empty list.
+    final rawList = response['accounts'] ?? response['loans'] ?? response['data'] ?? [];
     if (rawList is! List) return [];
 
     return rawList

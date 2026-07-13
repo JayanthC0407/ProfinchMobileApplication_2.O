@@ -23,9 +23,7 @@ class AccountRepository {
       },
     );
 
-    // OBDX list endpoints commonly wrap the array under a key — try the
-    // usual suspects, falling back to the raw list if the payload actually
-    // is one. Adjust the key below once you've confirmed the real shape.
+    // Confirmed real response shape wraps the list under "accounts".
     final rawList = response['accounts'] ??
         response['demandDeposits'] ??
         response['data'] ??
