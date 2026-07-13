@@ -58,6 +58,16 @@ class LoanModel {
     this.displayId = '',
   });
 
+  /// "***" + last 5 characters, e.g. "***00099". Prefers [displayId]
+  /// (OBDX's own masked value) and falls back to masking [id] directly if
+  /// [displayId] wasn't populated for some reason.
+  String get maskedId {
+    final source = displayId.isNotEmpty ? displayId : id;
+    if (source.isEmpty) return '';
+    final tail = source.length > 4 ? source.substring(source.length - 4) : source;
+    return '***$tail';
+  }
+
   /// Builds a [LoanModel] from a single entry in the OBDX
   /// `GET /digx-common/loan/v1/loan` response's `accounts` array.
   ///

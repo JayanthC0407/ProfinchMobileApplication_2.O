@@ -91,7 +91,7 @@ class LoanDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            detailRow("Loan ID", loan.id),
+            detailRow("Loan ID", loan.maskedId),
 
             detailRow(
               "Principal Amount",
