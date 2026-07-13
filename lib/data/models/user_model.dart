@@ -47,7 +47,8 @@ class UserModel {
 
     return UserModel(
       id: ((partyId != null ? partyId['value'] : null) ?? profile['userName'] ?? '').toString(),
-      username: (profile['userName'] ?? '').toString(),
+      // username: (profile['userName'] ?? '').toString(),
+      username: (firstName.isNotEmpty || lastName.isNotEmpty) ? '$firstName $lastName'.trim() : (profile['userName'] ?? '').toString(),
       email: ((emailId != null ? emailId['displayValue'] : null) ?? '').toString(),
       password: '', // never populated from the server response
       phoneNumber: ((phoneNumber != null ? phoneNumber['displayValue'] : null) ?? '').toString(),
