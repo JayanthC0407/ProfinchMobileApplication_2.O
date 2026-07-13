@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/core/utils/responsive_text.dart';
 import 'package:profinch_mobile_application/data/models/account_model.dart';
 
@@ -39,10 +40,10 @@ class _BalanceCardState extends State<BalanceCard> {
 
   // Different gradient per card so each account feels distinct
   static const List<List<Color>> _gradients = [
-    [Color(0xFFFFFFFF), Color(0xFFCDD3E9)],   // white → blue-grey (original)
-    [Color(0xFFE8F5E9), Color(0xFFB2DFDB)],   // light green → teal
-    [Color(0xFFFCE4EC), Color(0xFFE1BEE7)],   // light pink → purple
-    [Color(0xFFFFF8E1), Color(0xFFFFCCBC)],   // light amber → orange
+    [Color(0xFFFFFFFF), Color(0xFFCDD3E9)], // white → blue-grey (original)
+    [Color(0xFFE8F5E9), Color(0xFFB2DFDB)], // light green → teal
+    [Color(0xFFFCE4EC), Color(0xFFE1BEE7)], // light pink → purple
+    [Color(0xFFFFF8E1), Color(0xFFFFCCBC)], // light amber → orange
   ];
 
   @override
@@ -50,8 +51,9 @@ class _BalanceCardState extends State<BalanceCard> {
     super.initState();
 
     // Start on the account that was previously selected
-    _currentIndex = widget.accounts
-        .indexWhere((a) => a.id == widget.selectedAccountId);
+    _currentIndex = widget.accounts.indexWhere(
+      (a) => a.id == widget.selectedAccountId,
+    );
     if (_currentIndex < 0) _currentIndex = 0;
 
     _pageController = PageController(
@@ -66,8 +68,7 @@ class _BalanceCardState extends State<BalanceCard> {
     super.dispose();
   }
 
-  List<Color> _gradientFor(int index) =>
-      _gradients[index % _gradients.length];
+  List<Color> _gradientFor(int index) => _gradients[index % _gradients.length];
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +76,6 @@ class _BalanceCardState extends State<BalanceCard> {
 
     return Column(
       children: [
-
         // ── Swipeable cards ───────────────────────────────────
         SizedBox(
           height: 200,
@@ -115,21 +115,20 @@ class _BalanceCardState extends State<BalanceCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
                       // Top row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                          child: Text(
-                            account.accountType,
-                            style: TextStyle(
-                              color: const Color.fromARGB(179, 4, 27, 107),
-                              fontSize: AppFontSize.large(context),
-                              fontWeight: FontWeight.w600,
+                            child: Text(
+                              account.accountType,
+                              style: TextStyle(
+                                color: const Color.fromARGB(179, 4, 27, 107),
+                                fontSize: AppFontSize.large(context),
+                                fontWeight: FontWeight.w600,
                               ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -150,9 +149,11 @@ class _BalanceCardState extends State<BalanceCard> {
 
                       // Balance
                       Text(
-                        widget.isBalanceHidden
-                            ? '₹ ••••••'
-                            : '₹ ${account.availableBalance.toStringAsFixed(2)}',
+                        CurrencyFormatter.format(
+                          account.availableBalance,
+                          account.currencyCode,
+                          hideValue: widget.isBalanceHidden,
+                        ),
                         style: TextStyle(
                           color: const Color.fromARGB(255, 31, 4, 122),
                           fontSize: RT.fs(context, 30),
@@ -168,8 +169,9 @@ class _BalanceCardState extends State<BalanceCard> {
                             ? '•••• •••• ${account.accountNumber.length >= 4 ? account.accountNumber.substring(account.accountNumber.length - 4) : account.accountNumber}'
                             : account.accountNumber,
                         style: const TextStyle(
-                            color: Color.fromARGB(179, 55, 3, 133),
-                            fontSize: 13),
+                          color: Color.fromARGB(179, 55, 3, 133),
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
