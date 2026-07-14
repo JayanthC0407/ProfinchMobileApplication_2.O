@@ -102,7 +102,9 @@ class LoanProvider extends ChangeNotifier {
 
       autoPayDate: loan.autoPayDate,
 
-      status: updatedOutstanding <= 0 ? "CLOSED" : "ACTIVE",
+      status: updatedOutstanding <= 0 ? "CLOSED" : "ACTIVE", 
+      
+      currencyCode: '',
     );
 
     notifyListeners();

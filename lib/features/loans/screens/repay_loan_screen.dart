@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/core/utils/responsive_text.dart';
 import 'package:profinch_mobile_application/features/auth/provider/auth_provider.dart';
 import 'package:provider/provider.dart';
@@ -73,10 +74,10 @@ class _RepayLoanScreenState extends State<RepayLoanScreen> {
 
                   const SizedBox(height: 10),
 
-                  Text("EMI: ₹${widget.loan.emiAmount.toStringAsFixed(2)}"),
+                  Text("EMI: ${CurrencyFormatter.format(widget.loan.emiAmount, widget.loan.currencyCode)}"),
 
                   Text(
-                    "Outstanding: ₹${widget.loan.outstandingAmount.toStringAsFixed(2)}",
+                    "Outstanding: ${CurrencyFormatter.format(widget.loan.outstandingAmount, widget.loan.currencyCode)}",
                   ),
                 ],
               ),

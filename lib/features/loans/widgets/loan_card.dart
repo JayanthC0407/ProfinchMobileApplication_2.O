@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import '../../../data/models/loan_model.dart';
 
 class LoanCard extends StatelessWidget {
@@ -108,7 +109,7 @@ class LoanCard extends StatelessWidget {
                     children: [
                       Text(
                         loan.loanType,
-                        style:  TextStyle(
+                        style: TextStyle(
                           fontSize: AppFontSize.medium(context),
                           fontWeight: FontWeight.w600,
                         ),
@@ -126,8 +127,10 @@ class LoanCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -149,8 +152,10 @@ class LoanCard extends StatelessWidget {
                 Expanded(
                   child: _InfoChip(
                     label: "Outstanding",
-                    value:
-                        "₹${loan.outstandingAmount.toStringAsFixed(0)}",
+                    value: CurrencyFormatter.format(
+                      loan.outstandingAmount,
+                      loan.currencyCode,
+                    ),
                     valueColor: Colors.red.shade600,
                   ),
                 ),
@@ -158,7 +163,7 @@ class LoanCard extends StatelessWidget {
                   child: _InfoChip(
                     label: "EMI / Month",
                     value:
-                        "${loan.emiIsEstimated ? '~' : ''}₹${loan.emiAmount.toStringAsFixed(0)}",
+                        "${loan.emiIsEstimated ? '~' : ''}${CurrencyFormatter.format(loan.emiAmount, loan.currencyCode)}",
                     valueColor: Colors.blue.shade700,
                   ),
                 ),
@@ -221,7 +226,10 @@ class _InfoChip extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: AppFontSize.xs(context), color: Colors.grey.shade400),
+          style: TextStyle(
+            fontSize: AppFontSize.xs(context),
+            color: Colors.grey.shade400,
+          ),
         ),
         const SizedBox(height: 2),
         Text(

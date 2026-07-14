@@ -329,7 +329,9 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
 
                         autoPayDate: autoPayDate,
 
-                        status: "ACTIVE",
+                        status: "ACTIVE", 
+                        
+                        currencyCode: '',
                       ),
                     );
 

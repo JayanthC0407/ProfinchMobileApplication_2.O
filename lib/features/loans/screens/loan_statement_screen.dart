@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/colors.dart';
@@ -75,7 +76,8 @@ class LoanStatementScreen
                     ),
 
                     title: Text(
-                      "₹${statement.emiAmount.toStringAsFixed(2)}",
+                     CurrencyFormatter.format(
+                          statement.emiAmount, loan.currencyCode),
                     ),
 
                     subtitle: Text(
@@ -112,19 +114,19 @@ class LoanStatementScreen
                               children: [
 
                                 Text(
-                                  "EMI : ₹${statement.emiAmount}",
+                                  "EMI : ${CurrencyFormatter.format(statement.emiAmount, loan.currencyCode)}",
                                 ),
 
                                 Text(
-                                  "Principal : ₹${statement.principalComponent.toStringAsFixed(2)}",
+                                  "Principal : ${CurrencyFormatter.format(statement.principalComponent, loan.currencyCode)}",
                                 ),
 
                                 Text(
-                                  "Interest : ₹${statement.interestComponent.toStringAsFixed(2)}",
+                                  "Interest : ${CurrencyFormatter.format(statement.interestComponent, loan.currencyCode)}",
                                 ),
 
                                 Text(
-                                  "Outstanding : ₹${statement.remainingOutstanding.toStringAsFixed(2)}",
+                                  "Outstanding : ${CurrencyFormatter.format(statement.remainingOutstanding, loan.currencyCode)}",
                                 ),
                               ],
                             ),
