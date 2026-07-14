@@ -8,6 +8,7 @@ import '../widgets/transaction_tile_widget.dart';
 import '../widgets/transaction_filter_bar.dart';
 import '../widgets/transaction_summary_card.dart';
 import '../widgets/category_filter_sheet.dart';
+import 'package:profinch_mobile_application/data/repositories/common_repository.dart';
 
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 
@@ -33,6 +34,25 @@ class _TransactionHistoryView extends StatefulWidget {
 
 class _TransactionHistoryViewState extends State<_TransactionHistoryView> {
   final TextEditingController _searchController = TextEditingController();
+  final _commonRepository = CommonRepository();
+
+  /// OBDX's core banking business date — see CommonRepository doc. The
+  /// loaded transaction history can never contain anything after this
+  /// date, so the picker shouldn't let you select past it either (avoids
+  /// the confusing "picked a valid-looking date, got nothing" case).
+  DateTime? _serverCurrentDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _commonRepository.getCurrentDate().then((date) {
+      if (!mounted) return;
+      setState(() => _serverCurrentDate = date);
+    }).catchError((_) {
+      // Falls back to DateTime.now() at the call site below — non-fatal,
+      // this only affects the picker's upper bound.
+    });
+  }
 
   @override
   void dispose() {
@@ -43,7 +63,7 @@ class _TransactionHistoryViewState extends State<_TransactionHistoryView> {
   // ── Date range picker ──────────────────────────────────────────
   Future<void> _pickDateRange(
       BuildContext context, TransactionProvider provider) async {
-    final now = DateTime.now();
+    final now = _serverCurrentDate ?? DateTime.now();
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2024),
@@ -266,6 +286,36 @@ class _TransactionHistoryViewState extends State<_TransactionHistoryView> {
                   ],
                 ),
               ),
+
+              // ── Real-data load status (separate from "no results for
+              // your filters" — this is about the initial API fetch) ──
+              if (provider.isLoading && transactions.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (provider.loadError != null && transactions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Could not load transactions',
+                        style: TextStyle(
+                          fontSize: AppFontSize.body(context),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () => provider.refresh(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              else
 
               // ── Body ───────────────────────────────────────────
               Expanded(

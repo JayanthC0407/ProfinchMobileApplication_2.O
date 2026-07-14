@@ -5,7 +5,8 @@ import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/text_styles.dart';
 import 'package:profinch_mobile_application/data/models/account_model.dart';
 import 'package:profinch_mobile_application/data/models/transaction_model.dart';
-import 'package:profinch_mobile_application/features/Transactions/provider/transaction_provider.dart';
+import 'package:profinch_mobile_application/data/repositories/transaction_repository.dart';
+import 'package:profinch_mobile_application/data/repositories/common_repository.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 // ignore: avoid_web_libraries_in_flutter
@@ -24,63 +25,105 @@ class AccountStatementScreen extends StatefulWidget {
 }
 
 class _AccountStatementScreenState extends State<AccountStatementScreen> {
+  // Placeholder values until the real business date loads in initState —
+  // overwritten before the first transactions request goes out, so these
+  // never actually reach the server.
   DateTime _fromDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _toDate = DateTime.now();
   bool _isGenerating = false;
 
-  List<TransactionModel> get _filteredTransactions {
-    final from = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
-    final to = DateTime(_toDate.year, _toDate.month, _toDate.day, 23, 59, 59);
+  final _transactionRepository = TransactionRepository();
+  final _commonRepository = CommonRepository();
+  List<TransactionModel> _transactions = [];
+  bool _isLoading = false;
+  String? _loadError;
 
-    return TransactionProvider.instance.allTransactionsSorted
-        .where(
-          (t) =>
-              t.accountId == widget.account.id &&
-              t.date.isAfter(from.subtract(const Duration(seconds: 1))) &&
-              t.date.isBefore(to.add(const Duration(seconds: 1))),
-        )
-        .toList();
+  /// OBDX's core banking business date — see CommonRepository doc. Used
+  /// as "today" for the default range, quick-range chips, and the date
+  /// picker's max-selectable date, since the server rejects any fromDate/
+  /// toDate later than this (DIGX_DDA_051), regardless of the device's
+  /// actual current date.
+  DateTime? _serverCurrentDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDateRangeThenFetch();
   }
 
-  Map<String, double> _computeRunningBalances() {
-    // All transactions for this account, oldest first
-    final allForAccount =
-        TransactionProvider.instance.allTransactionsSorted
-            .where((t) => t.accountId == widget.account.id)
-            .toList()
-          ..sort((a, b) => a.date.compareTo(b.date));
-
-    if (allForAccount.isEmpty) return {};
-
-    double runningBalance = widget.account.availableBalance;
-    for (final t in allForAccount.reversed) {
-      if (t.type == TransactionType.credit) {
-        runningBalance -= t.amount;
-      } else {
-        runningBalance += t.amount;
-      }
+  Future<void> _initDateRangeThenFetch() async {
+    DateTime today;
+    try {
+      today = await _commonRepository.getCurrentDate();
+    } catch (_) {
+      // Fall back to device time — worst case the transactions call below
+      // surfaces the same "future date" validation error, which is
+      // already shown to the user via _loadError rather than failing
+      // silently.
+      today = DateTime.now();
     }
 
-    final computed = <String, double>{};
-    for (final t in allForAccount) {
-      if (t.type == TransactionType.credit) {
-        runningBalance += t.amount;
-      } else {
-        runningBalance -= t.amount;
-      }
-      computed[t.id] = runningBalance;
-    }
+    if (!mounted) return;
+    setState(() {
+      _serverCurrentDate = today;
+      _toDate = today;
+      _fromDate = today.subtract(const Duration(days: 30));
+    });
 
-    return computed;
+    _fetchTransactions();
+  }
+
+  Future<void> _fetchTransactions() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final result = await _transactionRepository.getAccountTransactions(
+        accountId: widget.account.id,
+        fromDate: _fromDate,
+        toDate: _toDate,
+      );
+
+      // Defensive client-side filter: the fromDate/toDate query param
+      // format sent to OBDX is confirmed correct (yyyy-MM-dd), but this
+      // still guards against the server returning a wider range than
+      // asked for.
+      final from = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
+      final to = DateTime(_toDate.year, _toDate.month, _toDate.day, 23, 59, 59);
+      final filtered = result
+          .where(
+            (t) =>
+                t.date.isAfter(from.subtract(const Duration(seconds: 1))) &&
+                t.date.isBefore(to.add(const Duration(seconds: 1))),
+          )
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+
+      if (!mounted) return;
+      setState(() {
+        _transactions = filtered;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _pickDate({required bool isFrom}) async {
-    final initial = isFrom ? _fromDate : _toDate;
+    final maxDate = _serverCurrentDate ?? DateTime.now();
+    final rawInitial = isFrom ? _fromDate : _toDate;
+    final initial = rawInitial.isAfter(maxDate) ? maxDate : rawInitial;
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: maxDate,
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(primary: AppColors.primary),
@@ -99,10 +142,20 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
         if (_toDate.isBefore(_fromDate)) _fromDate = _toDate;
       }
     });
+    _fetchTransactions();
+  }
+
+  void _applyQuickRange(int days) {
+    final today = _serverCurrentDate ?? DateTime.now();
+    setState(() {
+      _fromDate = today.subtract(Duration(days: days));
+      _toDate = today;
+    });
+    _fetchTransactions();
   }
 
   Future<void> _downloadPdf() async {
-    final transactions = _filteredTransactions;
+    final transactions = _transactions;
     if (transactions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No transactions in this date range.')),
@@ -145,8 +198,9 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
       //   ₹ (U+20B9 rupee)    → "Rs."  (replaced only in PDF, not in UI)
       String rs(double amount) => 'Rs. ${amount.toStringAsFixed(2)}';
 
-      // Use computed balances — not the stale t.balanceAfter values
-      final balanceMap = _computeRunningBalances();
+      // Use each transaction's own runningBalance from OBDX — authoritative,
+      // no need to walk/recompute it client-side like the old dummy-data
+      // version did.
       // PDF shows oldest-first so running balance reads top-to-bottom
       final txnOldestFirst = List<TransactionModel>.from(transactions)
         ..sort((a, b) => a.date.compareTo(b.date));
@@ -189,7 +243,7 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
                       t.title,
                       t.type == TransactionType.credit ? 'CR' : 'DR',
                       rs(t.amount),
-                      rs(balanceMap[t.id] ?? widget.account.availableBalance),
+                      rs(t.balanceAfter),
                     ])
                 .toList(),
             ),
@@ -245,8 +299,7 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final transactions = _filteredTransactions;
-    final balanceMap = _computeRunningBalances();
+    final transactions = _transactions;
     final totalCredit = transactions
         .where((t) => t.type == TransactionType.credit)
         .fold(0.0, (sum, t) => sum + t.amount);
@@ -345,30 +398,15 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
                           children: [
                             _RangeChip(
                               label: 'Last 7 days',
-                              onTap: () => setState(() {
-                                _fromDate = DateTime.now().subtract(
-                                  const Duration(days: 7),
-                                );
-                                _toDate = DateTime.now();
-                              }),
+                              onTap: () => _applyQuickRange(7),
                             ),
                             _RangeChip(
                               label: 'Last 30 days',
-                              onTap: () => setState(() {
-                                _fromDate = DateTime.now().subtract(
-                                  const Duration(days: 30),
-                                );
-                                _toDate = DateTime.now();
-                              }),
+                              onTap: () => _applyQuickRange(30),
                             ),
                             _RangeChip(
                               label: 'Last 3 months',
-                              onTap: () => setState(() {
-                                _fromDate = DateTime.now().subtract(
-                                  const Duration(days: 90),
-                                );
-                                _toDate = DateTime.now();
-                              }),
+                              onTap: () => _applyQuickRange(90),
                             ),
                           ],
                         ),
@@ -409,7 +447,43 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  if (transactions.isEmpty)
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_loadError != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.error_outline_rounded,
+                              size: 48,
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Could not load transactions',
+                              style: AppTextStyles.bodyBold(context),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _loadError!,
+                              style: AppTextStyles.caption(context),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              onPressed: _fetchTransactions,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (transactions.isEmpty)
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 40),
@@ -435,7 +509,7 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
                         transaction: t,
                         amountColor: _amountColor(t.type),
                         formatDate: _formatDate,
-                        computedBalance: balanceMap[t.id],
+                        computedBalance: t.balanceAfter,
                       ),
                     ),
                 ],

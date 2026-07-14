@@ -19,6 +19,7 @@ import 'package:profinch_mobile_application/features/auth/screens/signup_screen.
 import 'package:profinch_mobile_application/features/dashboard/provider/dashboard_provider.dart';
 import 'package:profinch_mobile_application/features/accounts/provider/account_provider.dart';
 import 'package:profinch_mobile_application/features/loans/provider/loan_provider.dart';
+import 'package:profinch_mobile_application/features/Transactions/provider/transaction_provider.dart';
 import 'package:profinch_mobile_application/shared/widgets/background_wrapper.dart';
 import 'package:profinch_mobile_application/shared/widgets/logo.dart';
 import 'package:profinch_mobile_application/shared/widgets/security_badge.dart';
@@ -93,6 +94,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final accounts = accountProvider.getAccountsByUserId(userId);
       final primaryAccountId = accounts.isNotEmpty ? accounts.first.id : '';
       context.read<DashboardProvider>().resetToPrimary(primaryAccountId);
+
+      // Recent transactions (Dashboard + Transaction History) — fetched
+      // across every CASA account, not awaited so it doesn't block
+      // navigation; both screens react via TransactionProvider's
+      // ChangeNotifier once this resolves.
+      TransactionProvider.instance.loadFromApi(
+        accountIds: accounts.map((a) => a.id).toList(),
+      );
 
       Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
     } else {

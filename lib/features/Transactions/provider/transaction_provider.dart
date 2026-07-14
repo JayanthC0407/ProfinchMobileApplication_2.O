@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/data/models/transaction_model.dart';
 import 'package:profinch_mobile_application/data/dummy/dummy_transactions.dart';
+import 'package:profinch_mobile_application/data/repositories/transaction_repository.dart';
+import 'package:profinch_mobile_application/data/repositories/common_repository.dart';
 
 enum TransactionFilter { all, credit, debit }
 
@@ -12,11 +14,31 @@ class TransactionProvider extends ChangeNotifier {
   // TransactionProvider.instance.addTransaction(...) (or one of the
   // convenience recorders below) and it will immediately appear on
   // the Dashboard and in Transaction History.
+  //
+  // ── Real data ────────────────────────────────────────────────
+  // [_allTransactions] starts seeded with dummy data (so the UI has
+  // something to show before login completes) and gets replaced with
+  // real OBDX transaction history via [loadFromApi], called once after
+  // login (see login_screen.dart) for every CASA account the user has —
+  // same convention as AccountProvider.loadAccounts. Anything added
+  // in-session afterwards via addTransaction()/the recorders above still
+  // layers on top of that real snapshot as usual.
   TransactionProvider._internal();
   static final TransactionProvider instance = TransactionProvider._internal();
 
-  final List<TransactionModel> _allTransactions =
+  final TransactionRepository _transactionRepository = TransactionRepository();
+  final CommonRepository _commonRepository = CommonRepository();
+
+  List<TransactionModel> _allTransactions =
       List.from(DummyTransactions.allTransactions);
+
+  bool isLoading = false;
+
+  /// Set if the last [loadFromApi] call failed — UI can show a retry
+  /// banner instead of silently showing stale/dummy data.
+  String? loadError;
+
+  List<String> _lastAccountIds = [];
 
   // ── Active filters ────────────────────────────────────────────
   TransactionFilter _typeFilter = TransactionFilter.all;
@@ -127,6 +149,68 @@ class TransactionProvider extends ChangeNotifier {
     _searchQuery = '';
     notifyListeners();
   }
+
+  // ── Real OBDX transaction history ───────────────────────────────
+  /// Fetches transactions for every given CASA account over the last
+  /// [lookbackDays] days and replaces [_allTransactions] with the merged,
+  /// date-sorted result — feeding both the Dashboard's "Recent
+  /// Transactions" and the Transaction History screen, since both just
+  /// read off this same list.
+  ///
+  /// Anchors the date range to OBDX's own business date (via
+  /// [CommonRepository]) rather than the device clock — see
+  /// `CommonRepository`/`AccountStatementScreen` for why: the server
+  /// rejects date ranges past its own "today" (DIGX_DDA_051), which in
+  /// this sandbox is 2022-12-22, not the real current date.
+  ///
+  /// Falls back to keeping whatever was already loaded (dummy data on
+  /// first run) if the call fails, same as [AccountProvider.loadAccounts]
+  /// — so the rest of the app doesn't break if this one call fails.
+  Future<void> loadFromApi({
+    required List<String> accountIds,
+    int lookbackDays = 30,
+  }) async {
+    if (accountIds.isEmpty) return;
+    _lastAccountIds = accountIds;
+
+    isLoading = true;
+    loadError = null;
+    notifyListeners();
+
+    try {
+      final today = await _commonRepository.getCurrentDate();
+      final fromDate = today.subtract(Duration(days: lookbackDays));
+
+      // One call per account, in parallel, then merge.
+      final perAccountResults = await Future.wait(
+        accountIds.map(
+          (id) => _transactionRepository.getAccountTransactions(
+            accountId: id,
+            fromDate: fromDate,
+            toDate: today,
+          ),
+        ),
+      );
+
+      final merged = perAccountResults.expand((list) => list).toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+
+      if (merged.isNotEmpty) {
+        _allTransactions = merged;
+      }
+    } catch (e) {
+      loadError = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Re-runs [loadFromApi] with whichever account ids were used last —
+  /// for a "Retry" button after a failed load, without the caller needing
+  /// to re-supply the account list.
+  Future<void> refresh() => loadFromApi(accountIds: _lastAccountIds);
+
 
   // ── Record a new transaction ────────────────────────────────────
   // The generic entry point. Call this from any flow once it has
