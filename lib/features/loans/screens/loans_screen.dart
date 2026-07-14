@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/core/utils/responsive_text.dart';
 import 'package:provider/provider.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
@@ -27,6 +28,9 @@ class LoansScreen extends StatelessWidget {
         activeLoans.fold<double>(0, (sum, l) => sum + l.outstandingAmount);
     final nextEmi =
         activeLoans.isNotEmpty ? activeLoans.first.emiAmount : 0.0;
+
+    final loanCurrency =
+        activeLoans.isNotEmpty ? activeLoans.first.currencyCode : '';
 
     return Scaffold(
       backgroundColor: AppColors.lightBlue,
@@ -105,7 +109,7 @@ class LoansScreen extends StatelessWidget {
                         const SizedBox(width: 10),
                         _SummaryCard(
                           label: "Outstanding",
-                          value: "₹${_formatAmount(totalOutstanding)}",
+                          value: "${CurrencyFormatter.symbolFor(loanCurrency)}${_formatAmount(totalOutstanding)}",
                           valueColor: Colors.black87,
                           valueFontSize: AppFontSize.body(context),
                         ),
@@ -114,7 +118,7 @@ class LoansScreen extends StatelessWidget {
                           label: "Next EMI",
                           value: activeLoans.isEmpty
                               ? "—"
-                              : "₹${nextEmi.toStringAsFixed(0)}",
+                              : "${CurrencyFormatter.symbolFor(loanCurrency)}${nextEmi.toStringAsFixed(0)}",
                           valueColor: Colors.green.shade700,
                         ),
                       ],

@@ -33,6 +33,8 @@ class DummyLoans {
       autoPayDate: 5,
 
       status: "ACTIVE",
+      currencyCode: "INR",
+
     ),
   ];
 }

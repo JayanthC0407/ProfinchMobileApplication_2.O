@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/text_styles.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/core/utils/responsive_text.dart';
+import 'package:profinch_mobile_application/data/models/account_model.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/provider/auth_provider.dart';
@@ -18,7 +20,9 @@ class AccountsScreen extends StatelessWidget {
     final accountProvider = Provider.of<AccountProvider>(context);
     final user = authProvider.currentUser!;
     final accounts = accountProvider.getAccountsByUserId(user.id);
+    // ignore: unused_local_variable
     final totalBalance = accountProvider.getTotalBalance(user.id);
+    final totalCurrency = accounts.isNotEmpty ? accounts.first.currencyCode : '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -48,8 +52,10 @@ class AccountsScreen extends StatelessWidget {
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back,
-                              color: AppColors.light),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: AppColors.light,
+                          ),
                           onPressed: () => Navigator.pop(context),
                         ),
                         const Spacer(),
@@ -73,8 +79,10 @@ class AccountsScreen extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     child: Text(
                       '${accounts.length} account${accounts.length == 1 ? '' : 's'}',
-                      style: AppTextStyles.whiteBody(context,
-                          color: AppColors.light.withValues(alpha: 0.65)),
+                      style: AppTextStyles.whiteBody(
+                        context,
+                        color: AppColors.light.withValues(alpha: 0.65),
+                      ),
                     ),
                   ),
                   // Total balance summary card
@@ -86,7 +94,8 @@ class AccountsScreen extends StatelessWidget {
                         color: AppColors.light.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                            color: AppColors.light.withValues(alpha: 0.2)),
+                          color: AppColors.light.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -100,7 +109,8 @@ class AccountsScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '₹ ${totalBalance.toStringAsFixed(2)}',
+                                CurrencyFormatter.format(
+                                    totalBalance, totalCurrency),
                                 style: TextStyle(
                                   color: AppColors.light,
                                   fontSize: RT.fs(context, 22),
@@ -142,8 +152,7 @@ class AccountsScreen extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          AccountDetailsScreen(account: account),
+                      builder: (_) => AccountDetailsScreen(account: account),
                     ),
                   ),
                 );

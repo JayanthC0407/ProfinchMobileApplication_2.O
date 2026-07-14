@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/core/utils/responsive_text.dart';
 import 'package:profinch_mobile_application/features/loans/screens/loan_statement_screen.dart';
 import 'package:profinch_mobile_application/features/loans/screens/repay_loan_screen.dart';
@@ -72,7 +73,8 @@ class LoanDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 10),
 
                   Text(
-                    "₹${loan.outstandingAmount.toStringAsFixed(2)}",
+                    CurrencyFormatter.format(
+                        loan.outstandingAmount, loan.currencyCode),
 
                     style:  TextStyle(
                       color: AppColors.light,
@@ -95,14 +97,14 @@ class LoanDetailsScreen extends StatelessWidget {
 
             detailRow(
               "Principal Amount",
-              "₹${loan.principalAmount.toStringAsFixed(2)}",
+              CurrencyFormatter.format(loan.principalAmount, loan.currencyCode),
             ),
 
             detailRow("Interest Rate", "${loan.interestRate}%"),
 
             detailRow("Tenure", "${loan.tenureMonths} Months"),
 
-            detailRow("EMI", "₹${loan.emiAmount.toStringAsFixed(2)}"),
+            detailRow("EMI", CurrencyFormatter.format(loan.emiAmount, loan.currencyCode)),
 
             detailRow("Status", loan.status),
 

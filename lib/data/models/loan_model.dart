@@ -37,6 +37,7 @@ class LoanModel {
   /// in place of [id], which is the long opaque value OBDX expects back
   /// as {loanId} on detail/schedule/outstanding calls.
   final String displayId;
+  final String currencyCode;
 
   LoanModel({
     required this.id,
@@ -56,6 +57,7 @@ class LoanModel {
     required this.autoPayDate,
     required this.status,
     this.displayId = '',
+    required this.currencyCode,
   });
 
   /// "***" + last 5 characters, e.g. "***00099". Prefers [displayId]
@@ -133,6 +135,7 @@ class LoanModel {
       autoPayEnabled: json['autoPayEnabled'] == true,
       autoPayDate: toInt(json['autoPayDate']),
       status: (json['status'] ?? 'ACTIVE').toString(),
+      currencyCode: (json['currencyCode'] ?? json['currency'] ?? '').toString(),
     );
   }
 }
