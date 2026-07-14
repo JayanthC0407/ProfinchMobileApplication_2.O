@@ -447,8 +447,51 @@ class DashboardScreen extends StatelessWidget {
                 AnimatedBuilder(
                   animation: TransactionProvider.instance,
                   builder: (context, _) {
-                    final recent = TransactionProvider.instance
-                        .recentTransactions(count: 2);
+                    final txnProvider = TransactionProvider.instance;
+                    final recent = txnProvider.recentTransactions(count: 2);
+
+                    if (recent.isEmpty && txnProvider.isLoading) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (recent.isEmpty && txnProvider.loadError != null) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Could not load recent transactions',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: AppFontSize.body(context),
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => txnProvider.refresh(),
+                              child: const Text(
+                                'Retry',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
                     return Column(
                       children: recent
                           .map(
