@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 import 'package:profinch_mobile_application/core/routes/app_routes.dart';
-import 'package:profinch_mobile_application/data/dummy/dummy_accounts.dart';
+import 'package:profinch_mobile_application/data/models/account_model.dart';
+import 'package:profinch_mobile_application/features/accounts/provider/account_provider.dart';
 import 'package:provider/provider.dart';
 import '../../auth/provider/auth_provider.dart';
 import '../widgets/profile_header.dart';
@@ -14,6 +15,7 @@ import 'security_settings_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'help_support_screen.dart';
 import 'package:profinch_mobile_application/features/notifications/provider/notification_provider.dart';
+import 'package:profinch_mobile_application/features/profile/provider/profile_provider.dart';
 
 // ── NEW (1) ── add these two imports ─────────────────────────────
 import 'package:profinch_mobile_application/core/l10n/app_localizations.dart';
@@ -32,6 +34,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // The selected language now lives in LanguageProvider, not local State.
 
   @override
+  void initState() {
+    super.initState();
+    // Fires the same three calls the browser network tab shows on this
+    // screen (country enum, party details, profileConfig) every time it
+    // opens — scheduled post-frame since it needs `context` to reach the
+    // provider and calling it directly in initState is too early.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ProfileProvider>().loadProfileDetails();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     // ── NEW ── one-liner lookup
     final t = AppLocalizations.of(context);
@@ -39,9 +54,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.currentUser!;
 
-    final primaryAccount = DummyAccounts.allAccounts.firstWhere(
-      (a) => a.id == user.primaryAccountId,
-    );
+    final profileProvider = Provider.of<ProfileProvider>(context);
+    final party = profileProvider.party;
+    final address = party?.preferredAddress;
+
+    final accountProvider = Provider.of<AccountProvider>(context);
+    final userAccounts = accountProvider.getAccountsByUserId(user.id);
+
+    // Was: `DummyAccounts.allAccounts.firstWhere((a) => a.id ==
+    // user.primaryAccountId)` with no `orElse` — that's what was throwing
+    // "Bad state: No element" on every open. Since accounts now come from
+    // the real demandDeposit API (see AccountProvider.loadAccounts), the
+    // static DummyAccounts list never contains a matching id, so
+    // firstWhere always failed. Pull from the real accounts instead, and
+    // fall back to an empty placeholder (rather than crashing) for the
+    // brief moment before AccountProvider.loadAccounts finishes — or if it
+    // fails entirely.
+    final primaryAccount = userAccounts.isEmpty
+        ? null
+        : userAccounts.firstWhere(
+            (a) => a.id == user.primaryAccountId,
+            orElse: () => userAccounts.first,
+          );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -117,10 +151,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               // ── Profile header ─────────────────────────────────
               ProfileHeader(
-                username: user.username,
-                email: user.email,
+                username: (party?.fullName.isNotEmpty ?? false)
+                    ? party!.fullName
+                    : user.username,
+                email: (party?.maskedEmail.isNotEmpty ?? false)
+                    ? party!.maskedEmail
+                    : user.email,
                 isKycVerified: user.isKycVerified,
-                accountType: primaryAccount.accountType,
+                accountType: primaryAccount?.accountType ?? '',
               ),
 
               const SizedBox(height: 24),
@@ -130,47 +168,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _sectionLabel(t.profile_sectionPersonal, context),
               const SizedBox(height: 10),
 
+              // ── NEW ── surfaces failures loading party/profileConfig/
+              // country instead of silently showing whatever was there
+              // before (same pattern as AccountProvider.loadError).
+              if (profileProvider.loadError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded,
+                          color: Colors.orange, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Some profile details couldn\'t be refreshed.',
+                          style: TextStyle(
+                            fontSize: AppFontSize.small(context),
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            profileProvider.loadProfileDetails(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+
               ProfileInfoTile(
                 // ── CHANGED ── was: 'PHONE NUMBER'
                 title: t.profile_phone,
-                value: user.phoneNumber,
+                value: (party?.maskedMobile.isNotEmpty ?? false)
+                    ? party!.maskedMobile
+                    : user.phoneNumber,
                 icon: Icons.phone_rounded,
               ),
 
-              ProfileInfoTile(
-                // ── CHANGED ── was: 'PAN NUMBER'
-                title: t.profile_pan,
-                value: user.panNumber,
-                icon: Icons.badge_rounded,
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4CD964).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFF4CD964).withOpacity(0.35),
-                    ),
-                  ),
-                  child: Text(
-                    // ── CHANGED ── was: 'Verified'
-                    t.profile_verified,
-                    style: const TextStyle(
-                      color: Color(0xFF4CD964),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              // ── NEW ── Date of birth, from /me/party — only shown once
+              // the party details have actually loaded (not present at all
+              // in the local UserModel, so there's no dummy fallback).
+              if (party?.birthDate != null)
+                ProfileInfoTile(
+                  title: 'DATE OF BIRTH',
+                  value: _formatDate(party!.birthDate!),
+                  icon: Icons.cake_rounded,
                 ),
-              ),
+
+              // ── NEW ── Residential/postal address, from /me/party —
+              // country code resolved to a display name via the
+              // enumerations/country list fetched alongside it.
+              if (address != null && !address.isEmpty)
+                ProfileInfoTile(
+                  title: 'ADDRESS',
+                  value: [
+                    address.displayLines,
+                    profileProvider.countryName(address.countryCode),
+                  ].where((s) => s.isNotEmpty).join(', '),
+                  icon: Icons.location_on_rounded,
+                ),
+
+              // ProfileInfoTile(
+              //   // ── CHANGED ── was: 'PAN NUMBER'
+              //   title: t.profile_pan,
+              //   value: user.panNumber,
+              //   icon: Icons.badge_rounded,
+              //   trailing: Container(
+              //     padding: const EdgeInsets.symmetric(
+              //       horizontal: 8,
+              //       vertical: 3,
+              //     ),
+              //     decoration: BoxDecoration(
+              //       color: const Color(0xFF4CD964).withOpacity(0.12),
+              //       borderRadius: BorderRadius.circular(6),
+              //       border: Border.all(
+              //         color: const Color(0xFF4CD964).withOpacity(0.35),
+              //       ),
+              //     ),
+              //     child: Text(
+              //       // ── CHANGED ── was: 'Verified'
+              //       t.profile_verified,
+              //       style: const TextStyle(
+              //         color: Color(0xFF4CD964),
+              //         fontSize: 10,
+              //         fontWeight: FontWeight.w600,
+              //       ),
+              //     ),
+              //   ),
+              // ),
 
               ProfileInfoTile(
                 // ── CHANGED ── was: 'PRIMARY ACCOUNT'
                 title: t.profile_primaryAccount,
-                value:
-                    '${primaryAccount.accountType}  •  ••••${primaryAccount.accountNumber.substring(primaryAccount.accountNumber.length - 4)}',
+                value: primaryAccount == null
+                    ? (accountProvider.isLoading ? 'Loading…' : '—')
+                    : '${primaryAccount.accountType}  •  ••••${primaryAccount.accountNumber.length >= 4 ? primaryAccount.accountNumber.substring(primaryAccount.accountNumber.length - 4) : primaryAccount.accountNumber}',
                 icon: Icons.account_balance_rounded,
               ),
 
@@ -423,7 +516,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'Nov',
       'Dec',
     ];
-    return '${months[date.month - 1]} ${date.year}';
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   // ── Language picker ─────────────────────────────────────────────
