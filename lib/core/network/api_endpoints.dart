@@ -41,4 +41,11 @@ class ApiEndpoints {
       '/digx-common/dda/v1/demandDeposit/$accountId/transactions';
   static const String demandDepositMediaType = '/digx-common/dda/v1/enumerations/mediatype';
   static const String currentDate = '/digx-common/common/v1/currentDate';
+
+  // ── Profile ──────────────────────────────────────────────────
+  // Fired together (in this order) whenever the Profile screen opens —
+  // confirmed from the browser network tab, not the Postman collection.
+  static const String partyDetails = '/digx-common/user/v1/me/party';
+  static const String profileConfig = '/digx-common/user/v1/profileConfig';
+  static const String countryEnum = '/digx-retail/origination/v1/enumerations/country';
 }

@@ -61,6 +61,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:profinch_mobile_application/core/l10n/app_localizations.dart';
 import 'package:profinch_mobile_application/features/profile/provider/language_provider.dart';
 import 'package:profinch_mobile_application/features/bills/provider/bills_provider.dart';
+import 'package:profinch_mobile_application/features/profile/provider/profile_provider.dart';
 
 void main() {
   runApp(
@@ -79,6 +80,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider.value(value: TransactionProvider.instance),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(
           create: (ctx) => BillsProvider(
             ctx.read<AuthProvider>(),
