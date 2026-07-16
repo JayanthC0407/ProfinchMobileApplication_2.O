@@ -42,11 +42,11 @@ class ApiClient {
         // plus Access-Control-Allow-Credentials: true — flag this to your
         // backend/infra team if cookies still don't seem to persist.
         extra: {'withCredentials': true},
+
         // We do our own status-code interpretation (OBDX can return
         // 4xx/417 for business-level "needs OTP" responses that still
         // carry a useful JSON body), so don't let Dio throw before we've
         // had a chance to inspect it.
-
         validateStatus: (_) => true,
       ),
     );
@@ -57,7 +57,13 @@ class ApiClient {
     // to the same host — the equivalent of what withCredentials does for
     // web above. Skipped on web since the browser already owns cookie
     // handling there (and JS can't touch Set-Cookie/Cookie headers anyway).
+    //
+    // Kept as a field (rather than an inline `CookieManager(CookieJar())`)
+    // so logout can actually clear it — otherwise the old session cookie
+    // just sits in the jar until the next login's Set-Cookie overwrites it.
+
     if (!kIsWeb) {
+      _cookieJar = CookieJar();
       _dio.interceptors.add(CookieManager(CookieJar()));
     }
 
@@ -87,6 +93,16 @@ class ApiClient {
 
   static final ApiClient instance = ApiClient._internal();
   late final Dio _dio;
+
+  CookieJar? _cookieJar; // null on web — browser owns cookies there instead
+
+  /// Clears the locally-held session cookie (e.g. OBDX's `secretKey`) on
+  /// logout. No-op on web, where there's no local CookieJar to clear —
+  /// the browser manages cookies there, and OBDX's own logout response
+  /// clearing/expiring the cookie server-side is what matters instead.
+  Future<void> clearCookies() async {
+    await _cookieJar?.deleteAll();
+  }
 
   /// Exposes the raw Dio instance for one-off needs (e.g. downloading a PDF
   /// statement with responseType: bytes) while everything else goes through
@@ -162,7 +178,8 @@ class ApiClient {
   /// This is where we decide success vs. failure vs. "OTP challenge".
   Map<String, dynamic> _processResponse(Response response) {
     final body = _asMap(response.data);
-    final challengeHeader = response.headers.value('X-CHALLENGE') ??
+    final challengeHeader =
+        response.headers.value('X-CHALLENGE') ??
         response.headers.value('x-challenge');
 
     if (challengeHeader != null) {

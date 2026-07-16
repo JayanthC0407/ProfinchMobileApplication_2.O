@@ -54,4 +54,6 @@ class ApiEndpoints {
   // and PUT (save the edited prefs back) — confirmed from the browser
   // network tab, including a real GET response and PUT payload.
   static const String userPreferences = '/digx-admin/sms/v1/userPreferences';
+    // ── User sessions / Login Activity ──────────────────────────
+  static const String userSessions = '/digx-common/user/v1/me/sessions';
 }
