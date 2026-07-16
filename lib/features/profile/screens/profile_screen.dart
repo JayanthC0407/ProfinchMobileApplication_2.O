@@ -20,6 +20,9 @@ import 'package:profinch_mobile_application/features/profile/provider/profile_pr
 // ── NEW (1) ── add these two imports ─────────────────────────────
 import 'package:profinch_mobile_application/core/l10n/app_localizations.dart';
 import 'package:profinch_mobile_application/features/profile/provider/language_provider.dart';
+import 'package:profinch_mobile_application/data/models/user_session_model.dart';
+import 'package:profinch_mobile_application/data/repositories/sesssion_repository.dart';
+import 'package:profinch_mobile_application/core/network/session_manager.dart';
 // ─────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
@@ -817,93 +820,260 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showLoginActivity(BuildContext context) {
-    final sessions = [
-      {'time': 'Today, 9:41 AM', 'ip': '192.168.1.10', 'loc': 'Bengaluru, IN'},
-      {'time': 'Yesterday, 6:22 PM', 'ip': '10.0.0.5', 'loc': 'Bengaluru, IN'},
-      {'time': 'Dec 18, 11:03 AM', 'ip': '172.16.0.2', 'loc': 'Mumbai, IN'},
-    ];
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E2640),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Login Activity',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: AppFontSize.large(context),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Recent sign-in sessions',
-              style: TextStyle(color: Color(0xFF8A9BB5), fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-            ...sessions.map(
-              (s) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        // The old version used a plain showModalBottomSheet with a fixed
+        // Column — fine for 3 hardcoded rows, but with a real session list
+        // (which can be long) that Column just grew past the screen and
+        // overflowed. DraggableScrollableSheet + a scrollable list inside
+        // fixes that: the sheet has a bounded height and the list scrolls
+        // within it instead of pushing content off-screen.
+        initialChildSize: 0.6,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E2640),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F1322),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2E3A57)),
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                child: Row(
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.login_rounded,
-                        color: Color(0xFFF59E0B),
-                        size: 18,
+                    Text(
+                      'Login Activity',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: AppFontSize.large(context),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            s['time']!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${s['ip']}  •  ${s['loc']}',
-                            style: const TextStyle(
-                              color: Color(0xFF8A9BB5),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Recent sign-in sessions',
+                      style: TextStyle(color: Color(0xFF8A9BB5), fontSize: 12),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: FutureBuilder<List<UserSessionModel>>(
+                  future: SessionRepository().getActiveSessions(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white70,
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Could not load login activity',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                _showLoginActivity(context);
+                              },
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final sessions = snapshot.data ?? [];
+                    if (sessions.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No active sessions found',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                      itemCount: sessions.length,
+                      itemBuilder: (_, i) =>
+                          _sessionTile(context, sessions[i]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Maps OBDX's `accessPointId` to the same human label the OBDX admin
+  /// portal's own "Session Summary" screen shows under "Channel" (e.g.
+  /// "Internet", "Mobile (Responsive)") — falls back to the raw value for
+  /// any channel not seen yet, rather than hiding it.
+  String _channelLabel(String accessPointId) {
+    switch (accessPointId.toUpperCase()) {
+      case 'APINTERNET':
+        return 'Internet';
+      case 'APMOBRESP':
+      case 'APMOBILE':
+        return 'Mobile (Responsive)';
+      default:
+        return accessPointId.isEmpty ? 'Unknown' : accessPointId;
+    }
+  }
+
+  Widget _sessionBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _sessionTile(BuildContext context, UserSessionModel session) {
+    // The JWT's own interaction id (SessionManager.instance.interactionId)
+    // matches this same field format — if it lines up with a sessionId,
+    // that's the device you're currently using.
+    final isCurrent =
+        session.sessionId == SessionManager.instance.interactionId;
+    // A blank "End Date & Time" in the OBDX portal means the session is
+    // still open — same meaning here when lastUpdatedDate is null.
+    final isActive = session.lastUpdatedDate == null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1322),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isCurrent
+              ? const Color(0xFF4CD964).withOpacity(0.5)
+              : const Color(0xFF2E3A57),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.login_rounded,
+              color: Color(0xFFF59E0B),
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _formatSessionTime(session.creationDate),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (isCurrent) ...[
+                      const SizedBox(width: 6),
+                      _sessionBadge('This device', const Color(0xFF4CD964)),
+                    ] else if (isActive) ...[
+                      const SizedBox(width: 6),
+                      _sessionBadge('Active', const Color(0xFF4CD964)),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  session.lastUpdatedDate != null
+                      ? 'Ended ${_formatSessionTime(session.lastUpdatedDate!)}'
+                      : 'Still active',
+                  style: const TextStyle(
+                    color: Color(0xFF8A9BB5),
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${_channelLabel(session.accessPointId)}  •  ${session.ipAddress}',
+                  style: const TextStyle(
+                    color: Color(0xFF8A9BB5),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatSessionTime(DateTime dt) {
+    // Server sends UTC ("Z" suffix) — convert to local for display.
+    final local = dt.toLocal();
+    final now = DateTime.now();
+    final isToday = local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hour:$minute $ampm';
+
+    if (isToday) return 'Today, $time';
+    return '${local.day}/${local.month}/${local.year}, $time';
   }
 
   void _showNotificationPrefs(BuildContext context) {
@@ -917,81 +1087,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => const _NotificationPrefsSheet(),
     );
   }
-
-  // void _showStatementPrefs(BuildContext context) {
-  //   showModalBottomSheet(
-  //     context: context,
-  //     backgroundColor: const Color(0xFF1E2640),
-  //     shape: const RoundedRectangleBorder(
-  //       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-  //     ),
-  //     builder: (_) => Padding(
-  //       padding: const EdgeInsets.all(24),
-  //       child: Column(
-  //         mainAxisSize: MainAxisSize.min,
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         children: [
-  //           Text(
-  //             'Statement Delivery',
-  //             style: TextStyle(
-  //               color: Colors.white,
-  //               fontSize: AppFontSize.large(context),
-  //               fontWeight: FontWeight.w700,
-  //             ),
-  //           ),
-  //           const SizedBox(height: 16),
-  //           ...['Email (Digital)', 'Post (Physical)', 'Both'].map((opt) {
-  //             final isSelected = opt == 'Email (Digital)';
-  //             return GestureDetector(
-  //               onTap: () => Navigator.pop(context),
-  //               child: Container(
-  //                 margin: const EdgeInsets.only(bottom: 8),
-  //                 padding: const EdgeInsets.symmetric(
-  //                   horizontal: 16,
-  //                   vertical: 14,
-  //                 ),
-  //                 decoration: BoxDecoration(
-  //                   color: isSelected
-  //                       ? const Color(0xFF4A90D9).withOpacity(0.1)
-  //                       : const Color(0xFF0F1322),
-  //                   borderRadius: BorderRadius.circular(12),
-  //                   border: Border.all(
-  //                     color: isSelected
-  //                         ? const Color(0xFF4A90D9).withOpacity(0.4)
-  //                         : const Color(0xFF2E3A57),
-  //                   ),
-  //                 ),
-  //                 child: Row(
-  //                   children: [
-  //                     Text(
-  //                       opt,
-  //                       style: TextStyle(
-  //                         color: isSelected
-  //                             ? const Color(0xFF4A90D9)
-  //                             : Colors.white,
-  //                         fontSize: 14,
-  //                         fontWeight: isSelected
-  //                             ? FontWeight.w600
-  //                             : FontWeight.w400,
-  //                       ),
-  //                     ),
-  //                     const Spacer(),
-  //                     if (isSelected)
-  //                       const Icon(
-  //                         Icons.check_circle_rounded,
-  //                         color: Color(0xFF4A90D9),
-  //                         size: 18,
-  //                       ),
-  //                   ],
-  //                 ),
-  //               ),
-  //             );
-  //           }),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
 
   void _showRating(BuildContext context) {
     showModalBottomSheet(

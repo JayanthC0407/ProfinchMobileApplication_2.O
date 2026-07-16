@@ -48,4 +48,7 @@ class ApiEndpoints {
   static const String partyDetails = '/digx-common/user/v1/me/party';
   static const String profileConfig = '/digx-common/user/v1/profileConfig';
   static const String countryEnum = '/digx-retail/origination/v1/enumerations/country';
+
+    // ── User sessions / Login Activity ──────────────────────────
+  static const String userSessions = '/digx-common/user/v1/me/sessions';
 }
