@@ -91,12 +91,16 @@ class AuthRepository {
     }
   }
 
-  /// POST /digx-infra/login/v1/logout
+  /// POST /digx-infra/login/v1//logout
   Future<void> logout() async {
     try {
       await ApiClient.instance.post(ApiEndpoints.logout);
     } finally {
       SessionManager.instance.clear();
+      // Also drop the locally-held session cookie (mobile/desktop only —
+      // see ApiClient.clearCookies doc). Runs regardless of whether the
+      // server call above succeeded, same as SessionManager.clear() above.
+      await ApiClient.instance.clearCookies();
     }
   }
 
