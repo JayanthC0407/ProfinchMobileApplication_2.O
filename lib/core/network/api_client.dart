@@ -129,6 +129,28 @@ class ApiClient {
     }
   }
 
+  /// Needed for the primary-account save flow (`PUT
+  /// /digx-admin/sms/v1/userPreferences`) — nothing else has needed a PUT
+  /// until now, only GET/POST.
+  Future<Map<String, dynamic>> put(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    try {
+      final response = await _dio.put(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+      );
+      return _processResponse(response);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   Map<String, dynamic> _asMap(dynamic data) {
     if (data == null) return {};
     if (data is Map<String, dynamic>) return data;

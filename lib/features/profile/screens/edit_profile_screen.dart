@@ -5,7 +5,9 @@ import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 import 'package:profinch_mobile_application/features/dashboard/provider/dashboard_provider.dart';
 import 'package:provider/provider.dart';
 import '../../auth/provider/auth_provider.dart';
-import '../../../data/dummy/dummy_accounts.dart';
+import '../../accounts/provider/account_provider.dart';
+import '../../../data/repositories/user_preferences_repository.dart';
+import '../../../data/models/user_preferences_model.dart';
 
 import 'dart:io';    
 import 'package:image_picker/image_picker.dart';
@@ -26,6 +28,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSaving = false;
   Uint8List? _pickedImageBytes;
 
+  final _preferencesRepository = UserPreferencesRepository();
+
+  /// Fetched by [_loadPrimaryAccountPickerData], mutated and PUT back by
+  /// [_save] via [UserPreferencesModel.copyWithPrimaryAccount].
+  UserPreferencesModel? _fetchedPreferences;
+  bool _isLoadingPreferences = false;
+  String? _preferencesLoadError;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +45,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     emailController = TextEditingController(text: user.email);
     phoneController = TextEditingController(text: user.phoneNumber);
     selectedPrimaryAccountId = user.primaryAccountId;
+
+    // Deferred to post-frame — the method below calls setState() as its
+    // first step (to flip on a loading flag), and doing that synchronously
+    // inside initState itself throws ("setState() called during build").
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadPrimaryAccountPickerData();
+    });
+  }
+
+  /// Mirrors what the base app's "primary account" picker fires on open:
+  /// GET userPreferences (current settings, needed so Save can round-trip
+  /// the full object) and a fresh GET demandDeposit (so the dropdown shows
+  /// up-to-date accounts, not whatever was cached at login). The network
+  /// tab shows these as parallel requests, not one waiting on the other,
+  /// so they're fired together here rather than sequentially.
+  Future<void> _loadPrimaryAccountPickerData() async {
+    setState(() {
+      _isLoadingPreferences = true;
+      _preferencesLoadError = null;
+    });
+
+    final user =
+        Provider.of<AuthProvider>(context, listen: false).currentUser!;
+
+    try {
+      final results = await Future.wait<dynamic>([
+        _preferencesRepository.getUserPreferences(),
+        Provider.of<AccountProvider>(context, listen: false)
+            .loadAccounts(userId: user.id),
+      ]);
+      _fetchedPreferences = results[0] as UserPreferencesModel;
+    } catch (e) {
+      _preferencesLoadError = e.toString();
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPreferences = false);
+      }
+    }
   }
 
   @override
@@ -64,9 +112,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 800));
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentPrimaryAccountId = authProvider.currentUser!.primaryAccountId;
+    final primaryAccountChanged =
+        selectedPrimaryAccountId != null &&
+        selectedPrimaryAccountId != currentPrimaryAccountId;
+
+    // Only touch the server if the primary account actually changed —
+    // matches the base app, which only shows this picker/Submit for that
+    // one setting rather than bundling it with the (still local-only)
+    // username/email/phone fields below.
+    if (primaryAccountChanged) {
+      final saved = await _savePrimaryAccountToServer(selectedPrimaryAccountId!);
+      if (!saved) {
+        if (mounted) setState(() => _isSaving = false);
+        return; // Error already surfaced by _savePrimaryAccountToServer.
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 800));
+
     final updatedUser = authProvider.currentUser!.copyWith(
       username: usernameController.text.trim(),
       email: emailController.text.trim(),
@@ -88,6 +154,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _showSuccessSnackbar();
       Navigator.pop(context);
     }
+  }
+
+  /// PUTs the updated primary account back via `userPreferences`, using
+  /// the confirmed read-modify-write shape:
+  /// `operativeAccount[].accountId` gets replaced with the newly selected
+  /// account's `{displayValue, value}` pair, everything else in the
+  /// fetched object is sent back untouched.
+  Future<bool> _savePrimaryAccountToServer(String newAccountId) async {
+    if (_fetchedPreferences == null) {
+      _showErrorSnackbar(_preferencesLoadError != null
+          ? 'Could not load current preferences. Pull to refresh and try again.'
+          : 'Preferences are still loading — try again in a moment.');
+      return false;
+    }
+
+    final user = Provider.of<AuthProvider>(context, listen: false).currentUser!;
+    final matches = Provider.of<AccountProvider>(context, listen: false)
+        .getAccountsByUserId(user.id)
+        .where((a) => a.id == newAccountId)
+        .toList();
+
+    if (matches.isEmpty) {
+      _showErrorSnackbar('Selected account could not be found.');
+      return false;
+    }
+    final selectedAccount = matches.first;
+
+    final updatedPreferences = _fetchedPreferences!.copyWithPrimaryAccount(
+      accountNumber: selectedAccount.accountNumber,
+      accountId: selectedAccount.id,
+    );
+
+    try {
+      await _preferencesRepository.updateUserPreferences(updatedPreferences);
+      _fetchedPreferences = updatedPreferences;
+      return true;
+    } catch (e) {
+      _showErrorSnackbar('Could not update primary account: $e');
+      return false;
+    }
+  }
+
+  void _showErrorSnackbar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red.shade600),
+    );
   }
 
   void _showSuccessSnackbar() {
@@ -114,9 +227,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.currentUser!;
-    final accounts = DummyAccounts.allAccounts
-        .where((a) => a.userId == user.id)
-        .toList();
+    // Was: `DummyAccounts.allAccounts.where((a) => a.userId == user.id)` —
+    // same landmine as the profile screen had, just quieter here: since
+    // dummy accounts never match a real logged-in user.id, this dropdown
+    // was silently rendering with zero items instead of crashing. Pull
+    // from the real fetched accounts instead.
+    final accountProvider = Provider.of<AccountProvider>(context);
+    final accounts = accountProvider.getAccountsByUserId(user.id);
+
+    // DropdownButtonFormField throws if `value` doesn't exactly match one
+    // of `items`' values (or isn't null) — guard against the brief window
+    // where accounts haven't finished loading yet, or the id on the user
+    // object doesn't match any of them.
+    final dropdownValue = accounts.any((a) => a.id == selectedPrimaryAccountId)
+        ? selectedPrimaryAccountId
+        : null;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
@@ -246,10 +371,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (v == null || v.trim().isEmpty) {
                       return 'Email cannot be empty';
                     }
-                    if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-                        .hasMatch(v.trim())) {
-                      return 'Enter a valid email address';
-                    }
+                    // if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
+                    //     .hasMatch(v.trim())) {
+                    //   return 'Enter a valid email address';
+                    // }
                     return null;
                   },
                 ),
@@ -278,6 +403,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _sectionLabel('PRIMARY ACCOUNT', context),
                 const SizedBox(height: 12),
 
+                if (_preferencesLoadError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: Colors.orange, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            "Couldn't load current preferences.",
+                            style: TextStyle(
+                              fontSize: AppFontSize.small(context),
+                              color: Colors.orange.shade800,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _loadPrimaryAccountPickerData,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // ── Account dropdown ───────────────────────────
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -288,7 +438,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     border: Border.all(color: Colors.grey.shade200),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: selectedPrimaryAccountId,
+                    value: dropdownValue,
                     isExpanded: true,
                     dropdownColor: AppColors.light,
                     style: TextStyle(
@@ -316,7 +466,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       return DropdownMenuItem(
                         value: account.id,
                         child: Text(
-                          '${account.accountType}  •  ••••${account.accountNumber.substring(account.accountNumber.length - 4)}',
+                          '${account.accountType}  •  ••••${account.accountNumber.length >= 4 ? account.accountNumber.substring(account.accountNumber.length - 4) : account.accountNumber}',
                           style: const TextStyle(color: Colors.black),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,

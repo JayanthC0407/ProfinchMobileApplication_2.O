@@ -48,4 +48,10 @@ class ApiEndpoints {
   static const String partyDetails = '/digx-common/user/v1/me/party';
   static const String profileConfig = '/digx-common/user/v1/profileConfig';
   static const String countryEnum = '/digx-retail/origination/v1/enumerations/country';
+
+  // ── Primary account (edit profile) ──────────────────────────
+  // Same path for GET (fetch current prefs before showing the picker)
+  // and PUT (save the edited prefs back) — confirmed from the browser
+  // network tab, including a real GET response and PUT payload.
+  static const String userPreferences = '/digx-admin/sms/v1/userPreferences';
 }
