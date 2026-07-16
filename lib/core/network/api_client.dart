@@ -202,10 +202,9 @@ class ApiClient {
 
     final status = response.statusCode ?? 0;
     if (status == 401 || status == 403) {
-      SessionManager.instance.clear();
+      SessionManager.instance.notifySessionExpired();
       throw ApiException.unauthorized();
     }
-
     // OBDX status envelope: { "status": { "result": "SUCCESSFUL" | other } }
     final statusEnvelope = body['status'];
     if (statusEnvelope is Map) {

@@ -1,13 +1,47 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:profinch_mobile_application/core/navigation/navigation_service.dart';
 import 'package:profinch_mobile_application/core/network/api_exception.dart';
+import 'package:profinch_mobile_application/core/network/session_manager.dart';
+import 'package:profinch_mobile_application/core/routes/app_routes.dart';
 import 'package:profinch_mobile_application/core/services/biometric_service.dart';
 import 'package:profinch_mobile_application/data/models/user_model.dart';
 import 'package:profinch_mobile_application/data/repositories/auth_repository.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repository = AuthRepository();
+
+  AuthProvider() {
+    // Registered once here so ANY API call, from any screen/provider, that
+    // comes back 401/403 (expired/invalidated session) ends up redirecting
+    // to the login screen — instead of the app just sitting on the current
+    // screen with every subsequent call silently failing.
+    SessionManager.instance.onSessionExpired = _handleSessionExpired;
+  }
+
+  void _handleSessionExpired() {
+    currentUser = null;
+    otpPending = false;
+    isLoading = false;
+    errorMessage = 'Your session has expired. Please log in again.';
+    notifyListeners();
+
+    final navigator = NavigationService.navigatorKey.currentState;
+    // Clears the entire navigation stack (dashboard, transfers, whatever
+    // screen the user was on) so they land cleanly on login rather than
+    // being able to "back" into stale authenticated screens.
+    navigator?.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+
+    final context = NavigationService.navigatorKey.currentContext;
+    if (context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your session has expired. Please log in again.'),
+        ),
+      );
+    }
+  }
 
   UserModel? currentUser;
   bool isLoading = false;
