@@ -63,6 +63,8 @@ import 'package:profinch_mobile_application/features/profile/provider/language_p
 import 'package:profinch_mobile_application/features/bills/provider/bills_provider.dart';
 import 'package:profinch_mobile_application/features/profile/provider/profile_provider.dart';
 
+import 'core/navigation/navigation_service.dart';
+
 void main() {
   runApp(
     MultiProvider(
@@ -103,6 +105,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Profinch Bank',
       debugShowCheckedModeBanner: false,
+      navigatorKey: NavigationService.navigatorKey,
 
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,

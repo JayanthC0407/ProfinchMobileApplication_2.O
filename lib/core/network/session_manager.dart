@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show VoidCallback;
 
 /// Holds everything the [ApiClient] needs to attach to outgoing requests:
 /// the JWT session token plus whatever OTP "challenge" context OBDX is
@@ -38,9 +39,34 @@ class SessionManager {
   bool get isLoggedIn => jwtToken != null && jwtToken!.isNotEmpty;
   bool get hasPendingChallenge => pendingReferenceNo != null;
 
+  /// Set once by [AuthProvider] at app start. Called when a request comes
+  /// back 401/403 while a session was active — i.e. the token expired or
+  /// was invalidated server-side mid-use, as opposed to a login attempt
+  /// simply failing (that never reaches here; login/OTP failures are
+  /// surfaced as regular ApiExceptions, not through this path).
+  VoidCallback? onSessionExpired;
+
+  /// Guards against every in-flight request that gets a 401 at the same
+  /// moment (e.g. dashboard firing several calls at once) all separately
+  /// triggering navigation/snackbars. Reset on the next successful login.
+  bool _expiryHandled = false;
+
   void setToken(String token) {
     jwtToken = token;
+    _expiryHandled = false;
     // TODO: persist via flutter_secure_storage for session restore.
+  }
+
+  /// Called by [ApiClient] whenever a request returns 401/403. Clears the
+  /// session and — only if there actually was one — fires
+  /// [onSessionExpired] exactly once, so the UI can redirect to login.
+  void notifySessionExpired() {
+    final wasLoggedIn = isLoggedIn;
+    clear();
+    if (wasLoggedIn && !_expiryHandled) {
+      _expiryHandled = true;
+      onSessionExpired?.call();
+    }
   }
 
   /// Parses the raw `X-CHALLENGE` header value, e.g.:
