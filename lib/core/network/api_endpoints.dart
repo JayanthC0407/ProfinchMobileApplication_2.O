@@ -14,32 +14,40 @@ class ApiEndpoints {
   static const String logout = '/digx-infra/login/v1/logout';
 
   // ── Biometric ────────────────────────────────────────────────
-  static const String mobileClientRegistration = '/digx-infra/mobile/v1/mobileClient';
+  static const String mobileClientRegistration =
+      '/digx-infra/mobile/v1/mobileClient';
   // NOTE: no dedicated "biometric verify/login" endpoint was present in the
   // collection — only device registration. Flag this with the backend team;
   // typically OBDX re-uses /login with x-authentication-type: BIOMETRIC or
   // similar, plus the registered secureDeviceId. Confirm before wiring #5/#6.
 
   // ── Forgot password / username ──────────────────────────────
-  static const String forgotCredentials = '/digx-admin/sms/v1/credentials/forgotCredentials';
-  static const String forgotUserId = '/digx-admin/sms/v1/credentials/forgotUserId';
+  static const String forgotCredentials =
+      '/digx-admin/sms/v1/credentials/forgotCredentials';
+  static const String forgotUserId =
+      '/digx-admin/sms/v1/credentials/forgotUserId';
 
   // ── Registration ─────────────────────────────────────────────
-  static const String accountTypesEnum = '/digx-common/party/v1/enumerations/accountTypes';
-  // NOTE: no create-user/registration submit endpoint exists in the
-  // collection. Item #1 (User registration) cannot be wired yet.
+  static const String accountTypesEnum =
+      '/digx-common/party/v1/enumerations/accountTypes';
+  static const String registration = '/digx-common/user/v1/registration';
+  static String registrationAuthentication(String registrationId) =>
+      '/digx-common/user/v1/registration/$registrationId/authentication';
 
   // ── Dashboard / Loan ─────────────────────────────────────────
   static const String loanList = '/digx-common/loan/v1/loan';
   static String loanById(String loanId) => '/digx-common/loan/v1/loan/$loanId';
-  static String loanSchedule(String loanId) => '/digx-common/loan/v1/loan/$loanId/schedule';
-  static String loanOutstanding(String loanId) => '/digx-common/loan/v1/loan/$loanId/outstanding';
+  static String loanSchedule(String loanId) =>
+      '/digx-common/loan/v1/loan/$loanId/schedule';
+  static String loanOutstanding(String loanId) =>
+      '/digx-common/loan/v1/loan/$loanId/outstanding';
 
   // ── CASA (Current & Savings Accounts) ───────────────────────
   static const String demandDeposit = '/digx-common/dda/v1/demandDeposit';
   static String demandDepositTransactions(String accountId) =>
       '/digx-common/dda/v1/demandDeposit/$accountId/transactions';
-  static const String demandDepositMediaType = '/digx-common/dda/v1/enumerations/mediatype';
+  static const String demandDepositMediaType =
+      '/digx-common/dda/v1/enumerations/mediatype';
   static const String currentDate = '/digx-common/common/v1/currentDate';
 
   // ── Profile ──────────────────────────────────────────────────
@@ -47,14 +55,15 @@ class ApiEndpoints {
   // confirmed from the browser network tab, not the Postman collection.
   static const String partyDetails = '/digx-common/user/v1/me/party';
   static const String profileConfig = '/digx-common/user/v1/profileConfig';
-  static const String countryEnum = '/digx-retail/origination/v1/enumerations/country';
+  static const String countryEnum =
+      '/digx-retail/origination/v1/enumerations/country';
 
   // ── Primary account (edit profile) ──────────────────────────
   // Same path for GET (fetch current prefs before showing the picker)
   // and PUT (save the edited prefs back) — confirmed from the browser
   // network tab, including a real GET response and PUT payload.
   static const String userPreferences = '/digx-admin/sms/v1/userPreferences';
-    // ── User sessions / Login Activity ──────────────────────────
+  // ── User sessions / Login Activity ──────────────────────────
   static const String userSessions = '/digx-common/user/v1/me/sessions';
 
   // ── Service requests ─────────────────────────────────────────
@@ -74,4 +83,15 @@ class ApiEndpoints {
   // ── Content (icons/images referenced by id, e.g. SR infoNote.icon) ──
   static String contentById(String contentId) =>
       '/digx-common/content/v1/contents/$contentId';
+  // ── Notifications (mailbox: alerts + mails) ─────────────────
+  static const String mailboxCount =
+      '/digx-common/collaboration/v1/mailbox/count';
+  static const String mailboxAlerts =
+      '/digx-common/collaboration/v1/mailbox/alerts';
+  static const String mailboxMails =
+      '/digx-common/collaboration/v1/mailbox/mails';
+  static const String mailboxMailers =
+      '/digx-common/collaboration/v1/mailbox/mailers';
+  static String mailboxAlertById(String alertId) =>
+      '/digx-common/collaboration/v1/mailbox/alerts/$alertId';
 }

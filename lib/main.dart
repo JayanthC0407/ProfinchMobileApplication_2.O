@@ -4,6 +4,7 @@ import 'package:profinch_mobile_application/features/Beneficiaries/screens/benef
 import 'package:profinch_mobile_application/features/Beneficiaries/screens/beneficiary_type_screen.dart';
 import 'package:profinch_mobile_application/features/Transactions/provider/transaction_provider.dart';
 import 'package:profinch_mobile_application/features/Transactions/screens/transaction_history_screen.dart';
+import 'package:profinch_mobile_application/features/analytics/screens/analytics_screen.dart';
 import 'package:profinch_mobile_application/features/calculators/screens/calculator_menu_screen.dart';
 import 'package:profinch_mobile_application/features/calculators/screens/currency_converter_screen.dart';
 import 'package:profinch_mobile_application/features/calculators/screens/loan_eligibility_screen.dart';
@@ -184,6 +185,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.raiseRequest: (context) => const RaiseRequestScreen(),
         AppRoutes.serviceRequestSuccess: (context) => const ServiceRequestSuccessScreen(),
         AppRoutes.trackRequest: (context) => const TrackRequestScreen(),
+        AppRoutes.analytics: (_) => const AnalyticsScreen(),
       },
     );
   }

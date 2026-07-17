@@ -21,7 +21,11 @@ class AccountCard extends StatelessWidget {
           color: AppColors.light, // light blue background
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Column(
+
+        child:Row(
+          children: [
+              Expanded (
+                        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -49,6 +53,15 @@ class AccountCard extends StatelessWidget {
             ),
           ],
         ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey.shade400,
+                size: 24,
+              ),
+          ]
+        )
+
       ),
     );
   }
