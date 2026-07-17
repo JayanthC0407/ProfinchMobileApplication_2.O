@@ -10,6 +10,7 @@ import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 import 'package:provider/provider.dart';
 
 import '../provider/dashboard_provider.dart';
+import '../widgets/app_menu_drawer.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/bottom_navbar.dart';
 import '../widgets/feature_item.dart';
@@ -22,7 +23,6 @@ import 'package:profinch_mobile_application/features/Transactions/screens/transa
 import 'package:profinch_mobile_application/features/notifications/provider/notification_provider.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 
-// ── NEW ──────────────────────────────────────────────────────────
 import 'package:profinch_mobile_application/core/l10n/app_localizations.dart';
 // ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +55,8 @@ class DashboardScreen extends StatelessWidget {
     );
 
     return Scaffold(
+      // Hamburger menu, mirroring the presales environment's side menu.
+      drawer: const AppMenuDrawer(),
       bottomNavigationBar: const BottomNavBar(),
       body: Container(
         decoration: const BoxDecoration(
@@ -75,37 +77,13 @@ class DashboardScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        GestureDetector(
-                          onTap: () =>
-                              Navigator.pushNamed(context, AppRoutes.profile),
-                          child: CircleAvatar(
-                            radius: 24,
-                            backgroundColor: AppColors.accent,
-                            child: ClipOval(
-                              child: authProvider.profileImageBytes != null
-                                  ? Image.memory(
-                                      authProvider.profileImageBytes!,
-                                      fit: BoxFit.cover,
-                                      width: 48,
-                                      height: 48,
-                                    )
-                                  : (user.profileImage.isNotEmpty
-                                        ? Image.asset(
-                                            user.profileImage,
-                                            fit: BoxFit.cover,
-                                            width: 48,
-                                            height: 48,
-                                            errorBuilder: (_, __, ___) =>
-                                                _initialsText(
-                                                  context,
-                                                  user.username,
-                                                ),
-                                          )
-                                        : _initialsText(
-                                            context,
-                                            user.username,
-                                          )),
-                            ),
+                        // hamburger menu
+                        Builder(
+                          builder: (context) => IconButton(
+                            icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => Scaffold.of(context).openDrawer(),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -515,23 +493,6 @@ class DashboardScreen extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _initialsText(BuildContext context, String username) {
-    return Text(
-      username
-          .trim()
-          .split(' ')
-          .where((e) => e.isNotEmpty)
-          .take(2)
-          .map((e) => e[0].toUpperCase())
-          .join(),
-      style: TextStyle(
-        color: AppColors.light,
-        fontSize: AppFontSize.body(context),
-        fontWeight: FontWeight.bold,
       ),
     );
   }

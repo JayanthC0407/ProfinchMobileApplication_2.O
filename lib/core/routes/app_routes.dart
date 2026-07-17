@@ -50,5 +50,7 @@ class AppRoutes {
   static const String adhocTransfer     = '/adhocTransfer';
   static const String scheduledPayment  = '/scheduledPayment';
   static const String favourites        = '/favourites';
+
+  static const String analytics = '/analytics';
   
 }
