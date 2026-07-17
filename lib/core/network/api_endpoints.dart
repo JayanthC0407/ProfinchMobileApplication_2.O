@@ -56,4 +56,22 @@ class ApiEndpoints {
   static const String userPreferences = '/digx-admin/sms/v1/userPreferences';
     // ── User sessions / Login Activity ──────────────────────────
   static const String userSessions = '/digx-common/user/v1/me/sessions';
+
+  // ── Service requests ─────────────────────────────────────────
+  // Flow confirmed from the browser network tab: definitions (list) +
+  // categories fire together when "Raise a new request" opens; tapping a
+  // result fires definitionById + the icon's content fetch together;
+  // Submit fires the POST, then a feedback-template GET (best-effort,
+  // doesn't block showing the success screen).
+  static const String serviceRequestDefinitions = '/digx-common/sr/v1/servicerequest/definitions';
+  static String serviceRequestDefinitionById(String id) =>
+      '/digx-common/sr/v1/servicerequest/definitions/$id';
+  static String serviceRequestCategories(String productId) =>
+      '/digx-common/sr/v1/servicerequest/products/$productId/categories';
+  static const String serviceRequestSubmit = '/digx-common/sr/v1/servicerequest';
+  static const String feedbackTemplate = '/digx-common/feedback/v1/feedback/template';
+
+  // ── Content (icons/images referenced by id, e.g. SR infoNote.icon) ──
+  static String contentById(String contentId) =>
+      '/digx-common/content/v1/contents/$contentId';
 }

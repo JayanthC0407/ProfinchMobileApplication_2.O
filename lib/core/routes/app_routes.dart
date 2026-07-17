@@ -51,4 +51,8 @@ class AppRoutes {
   static const String scheduledPayment  = '/scheduledPayment';
   static const String favourites        = '/favourites';
   
+  static const String serviceRequest = '/serviceRequest';
+  static const String raiseRequest = '/raiseRequest';
+  static const String serviceRequestSuccess = '/serviceRequestSuccess';
+  static const String trackRequest = '/trackRequest';
 }

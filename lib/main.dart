@@ -64,6 +64,11 @@ import 'package:profinch_mobile_application/features/bills/provider/bills_provid
 import 'package:profinch_mobile_application/features/profile/provider/profile_provider.dart';
 
 import 'core/navigation/navigation_service.dart';
+import 'package:profinch_mobile_application/features/service_request/provider/service_request_provider.dart';
+import 'package:profinch_mobile_application/features/service_request/screens/service_request_home_screen.dart';
+import 'package:profinch_mobile_application/features/service_request/screens/raise_request_screen.dart';
+import 'package:profinch_mobile_application/features/service_request/screens/service_request_success_screen.dart';
+import 'package:profinch_mobile_application/features/service_request/screens/track_request_screen.dart';
 
 void main() {
   runApp(
@@ -83,6 +88,7 @@ void main() {
         ChangeNotifierProvider.value(value: TransactionProvider.instance),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
+        ChangeNotifierProvider(create: (_) => ServiceRequestProvider()),
         ChangeNotifierProvider(
           create: (ctx) => BillsProvider(
             ctx.read<AuthProvider>(),
@@ -173,6 +179,11 @@ class MyApp extends StatelessWidget {
         AppRoutes.adhocTransfer: (context) => const AdhocTransferScreen(),
         AppRoutes.scheduledPayment: (context) => const ScheduledPaymentScreen(),
         AppRoutes.favourites: (context) => const FavouritesScreen(),
+
+        AppRoutes.serviceRequest: (context) => const ServiceRequestHomeScreen(),
+        AppRoutes.raiseRequest: (context) => const RaiseRequestScreen(),
+        AppRoutes.serviceRequestSuccess: (context) => const ServiceRequestSuccessScreen(),
+        AppRoutes.trackRequest: (context) => const TrackRequestScreen(),
       },
     );
   }
