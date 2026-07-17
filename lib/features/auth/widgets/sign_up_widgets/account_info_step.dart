@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:profinch_mobile_application/features/auth/widgets/sign_up_widgets/signup_text_field.dart';
+import 'package:profinch_mobile_application/data/repositories/registration_repository.dart';
 
 /// Registration wizard — Step 2: Account Information.
 /// (Customer ID, Account Number, Account Type, Debit Card Number, Terms)
@@ -9,7 +10,7 @@ class AccountInfoStep extends StatelessWidget {
   final TextEditingController partyIdController;
   final TextEditingController accountNumberController;
   final TextEditingController debitCardNumberController;
-  final List<String> accountTypes;
+  final List<AccountTypeOption> accountTypes;
   final bool isLoadingAccountTypes;
   final String? selectedAccountType;
   final ValueChanged<String?> onAccountTypeChanged;
@@ -125,8 +126,8 @@ class AccountInfoStep extends StatelessWidget {
                           style: TextStyle(fontSize: 14)),
                       items: accountTypes
                           .map((t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(t,
+                                value: t.code,
+                                child: Text(t.label,
                                     style: const TextStyle(fontSize: 14)),
                               ))
                           .toList(),
@@ -140,13 +141,14 @@ class AccountInfoStep extends StatelessWidget {
 
           SignUpTextField(
             controller: debitCardNumberController,
-            label: 'Debit Card Number *',
+            label: 'Debit Card Number (optional)',
             hint: '8888 8989 8989 9898 989',
             prefixIcon: Icons.credit_card_outlined,
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            validator: (v) => _validateRequired(v, 'Debit card number'),
+            // Confirmed not actually required server-side, despite the
+            // reference UI marking it required — no validator here.
           ),
           const SizedBox(height: 20),
 

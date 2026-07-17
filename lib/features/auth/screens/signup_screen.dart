@@ -38,7 +38,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _repository = RegistrationRepository();
 
   DateTime? _dateOfBirth;
-  List<String> _accountTypes = [];
+  List<AccountTypeOption> _accountTypes = [];
   bool _isLoadingAccountTypes = true;
   String? _selectedAccountType;
   bool _termsAccepted = false;
