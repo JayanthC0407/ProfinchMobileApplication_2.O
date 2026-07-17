@@ -20,16 +20,23 @@ class NotificationModel {
   bool isRead;
 
   /// Set only for notifications fetched from the real mailbox API
-  /// (alerts/mails) — null for the locally-generated mock notifications
-  /// created after bill pay / send money / transfer actions. Used to know
-  /// which API call to make when marking as read, and to distinguish
-  /// server-sourced items when refreshing (so a reload doesn't duplicate
-  /// or wipe out local ones).
+  /// (alerts/mails/mailers) — null for the locally-generated mock
+  /// notifications created after bill pay / send money / transfer
+  /// actions. Used to know which API call to make when marking as read,
+  /// and to distinguish server-sourced items when refreshing (so a
+  /// reload doesn't duplicate or wipe out local ones).
   final String? serverMessageIdValue;
   final String? serverMessageIdDisplayValue;
   final String? rawMessageType; // 'A' (alert), 'M'/'B' (mail), as sent by OBDX
 
-  bool get isServerSourced => serverMessageIdValue != null;
+  /// Which mailbox endpoint this came from: 'alert' | 'mail' | 'mailer' |
+  /// null (locally-generated). Deliberately separate from [rawMessageType]
+  /// — that's OBDX's own message-type code and isn't guaranteed to be
+  /// distinct/consistent across the three endpoints, so tab-filtering in
+  /// the UI keys off this instead of trying to infer source from it.
+  final String? serverSource;
+
+  bool get isServerSourced => serverSource != null;
 
   NotificationModel({
     required this.id,
@@ -42,6 +49,7 @@ class NotificationModel {
     this.serverMessageIdValue,
     this.serverMessageIdDisplayValue,
     this.rawMessageType,
+    this.serverSource,
   });
 
   /// Builds a [NotificationModel] from one entry in the confirmed live
@@ -73,6 +81,7 @@ class NotificationModel {
       serverMessageIdValue: value,
       serverMessageIdDisplayValue: displayValue,
       rawMessageType: (json['messageType'] ?? 'A').toString(),
+      serverSource: 'alert',
     );
   }
 
@@ -102,6 +111,38 @@ class NotificationModel {
       serverMessageIdValue: base.serverMessageIdValue,
       serverMessageIdDisplayValue: base.serverMessageIdDisplayValue,
       rawMessageType: (json['messageType'] ?? 'M').toString(),
+      serverSource: 'mail',
+    );
+  }
+
+  /// Builds a [NotificationModel] from one entry in the `mailerUserMapDTOs`
+  /// array (GET /digx-common/collaboration/v1/mailbox/mailers) — this is
+  /// what backs the "Notifications" tab, matching OBDX's own web portal
+  /// where Mails/Alerts/Notifications are three separate mailbox
+  /// endpoints, not a locally-invented category.
+  ///
+  /// ⚠️ Same caveat as mails: the sample response had an empty
+  /// `mailerUserMapDTOs` array, so this assumes the same
+  /// messageId/subject/messageBody/messageUserMappings shape as alerts —
+  /// verify against a populated response and adjust field names if they
+  /// differ.
+  factory NotificationModel.fromMailerJson(
+    Map<String, dynamic> json, {
+    required String userId,
+  }) {
+    final base = NotificationModel.fromAlertJson(json, userId: userId);
+    return NotificationModel(
+      id: 'mailer_${base.serverMessageIdValue ?? base.createdAt.toIso8601String()}',
+      userId: userId,
+      title: base.title,
+      body: base.body,
+      type: NotificationType.system,
+      createdAt: base.createdAt,
+      isRead: base.isRead,
+      serverMessageIdValue: base.serverMessageIdValue,
+      serverMessageIdDisplayValue: base.serverMessageIdDisplayValue,
+      rawMessageType: (json['messageType'] ?? 'B').toString(),
+      serverSource: 'mailer',
     );
   }
 

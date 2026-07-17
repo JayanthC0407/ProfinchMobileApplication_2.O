@@ -43,13 +43,16 @@ class NotificationProvider extends ChangeNotifier {
       final results = await Future.wait([
         _repository.getAlerts(),
         _repository.getMails(),
+        _repository.getMailers(),
       ]);
       final alerts = results[0];
       final mails = results[1];
+      final mailers = results[2];
 
       final fetched = <NotificationModel>[
         ...alerts.map((j) => NotificationModel.fromAlertJson(j, userId: userId)),
         ...mails.map((j) => NotificationModel.fromMailJson(j, userId: userId)),
+        ...mailers.map((j) => NotificationModel.fromMailerJson(j, userId: userId)),
       ];
 
       // Drop this user's previously-loaded server items, then re-insert
@@ -125,7 +128,7 @@ class NotificationProvider extends ChangeNotifier {
     notification.isRead = true;
     notifyListeners();
 
-    if (notification.isServerSourced && notification.rawMessageType == 'A') {
+    if (notification.serverSource == 'alert') {
       // Only alerts have a confirmed mark-as-read endpoint; mails' shape
       // (and whether the same endpoint applies) wasn't confirmed.
       try {
@@ -150,7 +153,7 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
 
     final serverAlerts = toMark.where(
-      (n) => n.isServerSourced && n.rawMessageType == 'A',
+      (n) => n.serverSource == 'alert',
     );
     for (final n in serverAlerts) {
       try {
