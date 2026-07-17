@@ -7,7 +7,19 @@ import 'package:profinch_mobile_application/data/models/notification_model.dart'
 import 'package:profinch_mobile_application/features/auth/provider/auth_provider.dart';
 import 'package:profinch_mobile_application/features/notifications/provider/notification_provider.dart';
 import 'package:profinch_mobile_application/features/notifications/widgets/notification_widget.dart';
+import 'notification_detail_screen.dart';
 
+/// Inbox, restructured to match the reference OBDX layout: three tabs
+/// split by *source* rather than by read-status/category —
+///   Mails         → real mailbox mails (getMails)
+///   Alerts (N)    → real mailbox alerts (getAlerts), N = unread count
+///   Notifications → locally-generated in-app notifications (bill pay,
+///                   send money, transfer confirmations, offers, etc.)
+/// — instead of the previous All/Unread/Transactions/Offers tabs, which
+/// mixed server and local items together in every tab.
+///
+/// Tapping any item now opens NotificationDetailScreen (full message
+/// view) instead of just marking read in place.
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
 
@@ -19,12 +31,10 @@ class _NotificationScreenState extends State<NotificationScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final List<String> _tabs = ['All', 'Unread', 'Transactions', 'Offers'];
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
     // Load real alerts/mails from the mailbox API as soon as the screen
     // opens — the bell badge on the dashboard only has the lightweight
@@ -43,24 +53,24 @@ class _NotificationScreenState extends State<NotificationScreen>
     super.dispose();
   }
 
-  List<NotificationModel> _filtered(List<NotificationModel> all, int tabIndex) {
-    switch (tabIndex) {
-      case 1:
-        return all.where((n) => !n.isRead).toList();
-      case 2:
-        return all
-            .where(
-              (n) =>
-                  n.type == NotificationType.transaction ||
-                  n.type == NotificationType.upi ||
-                  n.type == NotificationType.wallet,
-            )
-            .toList();
-      case 3:
-        return all.where((n) => n.type == NotificationType.offer).toList();
-      default:
-        return all;
-    }
+  List<NotificationModel> _mails(List<NotificationModel> all) =>
+      all.where((n) => n.serverSource == 'mail').toList();
+
+  List<NotificationModel> _alerts(List<NotificationModel> all) =>
+      all.where((n) => n.serverSource == 'alert').toList();
+
+  // Real mailers (GET .../mailbox/mailers) plus locally-generated in-app
+  // notifications (bill pay, transfers, offers) — both are "general
+  // notifications" that don't fit the more specific Mail/Alert buckets.
+  List<NotificationModel> _notifications(List<NotificationModel> all) => all
+      .where((n) => n.serverSource == 'mailer' || n.serverSource == null)
+      .toList();
+
+  void _openDetail(NotificationModel n) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NotificationDetailScreen(notification: n)),
+    );
   }
 
   @override
@@ -74,7 +84,7 @@ class _NotificationScreenState extends State<NotificationScreen>
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
-          'Notifications',
+          'Inbox',
           style: TextStyle(
             color: Colors.white,
             fontSize: AppFontSize.large(context),
@@ -82,23 +92,6 @@ class _NotificationScreenState extends State<NotificationScreen>
           ),
         ),
         actions: [
-          Consumer<NotificationProvider>(
-            builder: (context, provider, _) {
-              final hasUnread = provider.unreadCount(userId) > 0;
-              return hasUnread
-                  ? TextButton(
-                      onPressed: () => provider.markAllAsRead(userId),
-                      child: Text(
-                        'Mark all read',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: AppFontSize.small(context),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink();
-            },
-          ),
           Consumer<NotificationProvider>(
             builder: (context, provider, _) {
               final list = provider.getByUserId(userId);
@@ -116,21 +109,36 @@ class _NotificationScreenState extends State<NotificationScreen>
             },
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          labelStyle: TextStyle(
-            fontSize: AppFontSize.small(context),
-            fontWeight: FontWeight.w600,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Consumer<NotificationProvider>(
+            builder: (context, provider, _) {
+              final all = provider.getByUserId(userId);
+              final unreadAlerts =
+                  _alerts(all).where((n) => !n.isRead).length;
+
+              return TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white54,
+                labelStyle: TextStyle(
+                  fontSize: AppFontSize.small(context),
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: TextStyle(
+                  fontSize: AppFontSize.small(context),
+                  fontWeight: FontWeight.w500,
+                ),
+                tabs: [
+                  const Tab(text: 'Mails'),
+                  Tab(text: unreadAlerts > 0 ? 'Alerts ($unreadAlerts)' : 'Alerts'),
+                  const Tab(text: 'Notifications'),
+                ],
+              );
+            },
           ),
-          unselectedLabelStyle: TextStyle(
-            fontSize: AppFontSize.small(context),
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: _tabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
       body: Consumer<NotificationProvider>(
@@ -139,15 +147,52 @@ class _NotificationScreenState extends State<NotificationScreen>
 
           return TabBarView(
             controller: _tabController,
-            children: List.generate(_tabs.length, (i) {
-              final list = _filtered(all, i);
-              return RefreshIndicator(
-                onRefresh: () => provider.loadNotifications(userId),
-                child: _buildList(context, list, provider, userId),
-              );
-            }),
+            children: [
+              _tabBody(context, _mails(all), provider, userId, 'Mails'),
+              _tabBody(context, _alerts(all), provider, userId, 'Alerts'),
+              _tabBody(
+                  context, _notifications(all), provider, userId, 'Notifications'),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  /// Each tab gets its own explicit "Refresh" link (matching the
+  /// reference layout) in addition to pull-to-refresh, since the
+  /// reference shows it as a persistent, discoverable action rather than
+  /// relying on a swipe gesture alone.
+  Widget _tabBody(
+    BuildContext context,
+    List<NotificationModel> list,
+    NotificationProvider provider,
+    String userId,
+    String tabLabel,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () => provider.loadNotifications(userId),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () => provider.loadNotifications(userId),
+                child: Text(
+                  'Refresh',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: AppFontSize.small(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: _buildList(context, list, provider, tabLabel)),
+        ],
       ),
     );
   }
@@ -156,9 +201,9 @@ class _NotificationScreenState extends State<NotificationScreen>
     BuildContext context,
     List<NotificationModel> list,
     NotificationProvider provider,
-    String userId,
+    String tabLabel,
   ) {
-    if (list.isEmpty) return _buildEmptyState(context);
+    if (list.isEmpty) return _buildEmptyState(context, tabLabel);
 
     // Group by date
     final today = <NotificationModel>[];
@@ -186,7 +231,7 @@ class _NotificationScreenState extends State<NotificationScreen>
           ...today.map(
             (n) => NotificationTile(
               notification: n,
-              onTap: () => provider.markAsRead(n.id),
+              onTap: () => _openDetail(n),
               onDismiss: () => provider.deleteNotification(n.id),
             ),
           ),
@@ -196,7 +241,7 @@ class _NotificationScreenState extends State<NotificationScreen>
           ...yesterday.map(
             (n) => NotificationTile(
               notification: n,
-              onTap: () => provider.markAsRead(n.id),
+              onTap: () => _openDetail(n),
               onDismiss: () => provider.deleteNotification(n.id),
             ),
           ),
@@ -206,7 +251,7 @@ class _NotificationScreenState extends State<NotificationScreen>
           ...older.map(
             (n) => NotificationTile(
               notification: n,
-              onTap: () => provider.markAsRead(n.id),
+              onTap: () => _openDetail(n),
               onDismiss: () => provider.deleteNotification(n.id),
             ),
           ),
@@ -231,7 +276,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, String tabLabel) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return ListView(
@@ -245,22 +290,14 @@ class _NotificationScreenState extends State<NotificationScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.notifications_off_outlined,
+                    Icon(Icons.inbox_outlined,
                         size: 64, color: Colors.grey.shade300),
                     const SizedBox(height: 16),
                     Text(
-                      'No notifications',
+                      'No item in $tabLabel',
                       style: TextStyle(
                         fontSize: AppFontSize.medium(context),
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'You\'re all caught up!',
-                      style: TextStyle(
-                        fontSize: AppFontSize.small(context),
                         color: Colors.grey.shade400,
                       ),
                     ),
