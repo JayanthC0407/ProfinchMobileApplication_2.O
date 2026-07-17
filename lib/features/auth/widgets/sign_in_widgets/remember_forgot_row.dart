@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 
 class RememberForgotRow extends StatefulWidget {
-  final VoidCallback onForgotPassword;
+  final VoidCallback onTroubleSigningIn;
 
   const RememberForgotRow({
     super.key,
-    required this.onForgotPassword,
+    required this.onTroubleSigningIn,
   });
 
   @override
@@ -46,15 +46,20 @@ class _RememberForgotRowState extends State<RememberForgotRow> {
           ],
         ),
 
-        // ── Forgot password ────────────────────────────────────
+        // ── Trouble signing in ───────────────────────────────────
+        // Single entry point instead of two competing "Forgot
+        // password?"/"Forgot username?" links — branches into both via
+        // a bottom sheet (see login_screen.dart's _handleTroubleSigningIn).
         GestureDetector(
-          onTap: widget.onForgotPassword,
+          onTap: widget.onTroubleSigningIn,
           child: const Text(
-            'Forgot password?',
+            'Trouble signing in?',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: AppColors.light,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.light,
             ),
           ),
         ),

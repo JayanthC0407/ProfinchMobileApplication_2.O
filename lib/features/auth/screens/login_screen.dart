@@ -7,6 +7,7 @@ import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 import 'package:profinch_mobile_application/core/routes/app_routes.dart';
 import 'package:profinch_mobile_application/features/auth/provider/auth_provider.dart';
 import 'package:profinch_mobile_application/features/auth/screens/forgot_password_screen.dart';
+import 'package:profinch_mobile_application/features/auth/screens/forgot_username_screen.dart';
 import 'package:profinch_mobile_application/features/auth/screens/otp_screen.dart';
 import 'package:profinch_mobile_application/features/auth/screens/pin_screen.dart';
 import 'package:profinch_mobile_application/features/auth/screens/pattern_screen.dart';
@@ -23,6 +24,7 @@ import 'package:profinch_mobile_application/features/Transactions/provider/trans
 import 'package:profinch_mobile_application/shared/widgets/background_wrapper.dart';
 import 'package:profinch_mobile_application/shared/widgets/logo.dart';
 import 'package:profinch_mobile_application/shared/widgets/security_badge.dart';
+import 'package:profinch_mobile_application/features/notifications/provider/notification_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -90,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await accountProvider.loadAccounts(userId: userId);
       if (!mounted) return;
       context.read<LoanProvider>().loadLoanBalanceOverview(userId: userId);
+      context.read<NotificationProvider>().loadUnreadCount(userId);
 
       final accounts = accountProvider.getAccountsByUserId(userId);
       final primaryAccountId = accounts.isNotEmpty ? accounts.first.id : '';
@@ -117,11 +120,136 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // ── Trouble signing in ─────────────────────────────────────────
+  void _handleTroubleSigningIn() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2640),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Trouble signing in?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: AppFontSize.large(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose what you need help with',
+              style: TextStyle(color: Color(0xFF8A9BB5), fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+            _troubleOption(
+              sheetContext,
+              icon: Icons.lock_outline_rounded,
+              iconColor: const Color(0xFF4A90D9),
+              title: 'Forgot password?',
+              subtitle: "I know my username but not my password",
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _handleForgotPassword();
+              },
+            ),
+            const SizedBox(height: 10),
+            _troubleOption(
+              sheetContext,
+              icon: Icons.person_outline_rounded,
+              iconColor: const Color(0xFF9B59B6),
+              title: 'Forgot username?',
+              subtitle: "I don't remember my username",
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _handleForgotUsername();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _troubleOption(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1322),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF2E3A57)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF8A9BB5),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF8A9BB5), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Forgot password ───────────────────────────────────────────
   void _handleForgotPassword() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+    );
+  }
+
+  // ── Forgot username ───────────────────────────────────────────
+  void _handleForgotUsername() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ForgotUsernameScreen()),
     );
   }
 
@@ -240,7 +368,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   const SizedBox(height: 20),
-                  RememberForgotRow(onForgotPassword: _handleForgotPassword),
+                  RememberForgotRow(
+                    onTroubleSigningIn: _handleTroubleSigningIn,
+                  ),
                   const SizedBox(height: 24),
 
                   SignInButton(
