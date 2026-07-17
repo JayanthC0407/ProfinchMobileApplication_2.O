@@ -790,8 +790,6 @@ class _MenuNodeTileState extends State<_MenuNodeTile> {
       );
     }
 
-    final hasDirectNavigation = node.onNavigate != null;
-
     return Column(
       children: [
         Material(
@@ -804,9 +802,7 @@ class _MenuNodeTileState extends State<_MenuNodeTile> {
               Expanded(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: hasDirectNavigation
-                      ? () => _navigate(context)
-                      : _toggleExpanded,
+                  onTap: _toggleExpanded,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       leftPadding,
