@@ -18,45 +18,64 @@ import 'anonymous_session_mixin.dart';
 /// variable carried over from a prior folder run. Worth confirming with a
 /// live call; if OBDX 401s on step 2/3 even with the token attached, try
 /// dropping the Authorization header entirely for this flow instead.
+/// One entry from the accountTypes enum — [code] is what actually gets
+/// sent as `accountType` in the registration POST (e.g. "CSA"), [label]
+/// is what the dropdown should display (e.g. "Current and Saving").
+class AccountTypeOption {
+  final String code;
+  final String label;
+
+  AccountTypeOption({required this.code, required this.label});
+}
+
 class RegistrationRepository with AnonymousSessionMixin {
   /// GET accountTypes
   ///
-  /// ⚠️ UNCONFIRMED response shape — no saved example in the collection.
-  /// This defensively tries a few common enum-response shapes (a plain
-  /// list of strings, a list of `{code,value}`-style maps under various
-  /// likely keys) and falls back to returning whatever list it can find.
-  /// Verify against a live call and tighten this once you see the real
-  /// shape — don't trust this blindly for a picker's source of truth yet.
-  Future<List<String>> getAccountTypes() async {
+  /// Confirmed real response shape (this was previously a guess that
+  /// missed — the list sits nested two levels deep, which is why the
+  /// dropdown was coming back empty despite the call succeeding):
+  /// ```json
+  /// {
+  ///   "enumRepresentations": [
+  ///     { "data": [
+  ///       { "code": "CSA", "value": "CSA", "description": "Current and Saving", "ordinal": 0 },
+  ///       { "code": "LON", "value": "LON", "description": "Loan", "ordinal": 1 },
+  ///       ...
+  ///     ] }
+  ///   ]
+  /// }
+  /// ```
+  /// `code` is the value to submit back in the registration POST;
+  /// `description` is what the dropdown shows. Sorted by `ordinal` in
+  /// case a future response doesn't already arrive pre-sorted.
+  Future<List<AccountTypeOption>> getAccountTypes() async {
     final response = await ApiClient.instance.get(
       ApiEndpoints.accountTypesEnum,
     );
 
-    dynamic rawList = response['accountTypes'] ??
-        response['accountTypeList'] ??
-        response['enumerationDTOList'] ??
-        response['data'];
+    final groups = response['enumRepresentations'];
+    if (groups is! List) return [];
 
-    if (rawList is! List) {
-      // Last resort: maybe the whole body IS the list (some OBDX enum
-      // endpoints return a bare JSON array rather than an envelope).
-      rawList = response.values.firstWhere(
-        (v) => v is List,
-        orElse: () => <dynamic>[],
-      );
+    final options = <MapEntry<int, AccountTypeOption>>[];
+    for (final group in groups) {
+      final data = (group is Map) ? group['data'] : null;
+      if (data is! List) continue;
+      for (final entry in data) {
+        if (entry is! Map) continue;
+        final code = entry['code']?.toString();
+        if (code == null || code.isEmpty) continue;
+        final label =
+            (entry['description'] ?? entry['value'] ?? code).toString();
+        final ordinal = int.tryParse(entry['ordinal']?.toString() ?? '') ??
+            options.length;
+        options.add(
+          MapEntry(ordinal, AccountTypeOption(code: code, label: label)),
+        );
+      }
     }
 
-    return rawList
-        .map((e) {
-          if (e is String) return e;
-          if (e is Map) {
-            return (e['code'] ?? e['value'] ?? e['id'] ?? e['name'])
-                ?.toString();
-          }
-          return e?.toString();
-        })
-        .whereType<String>()
-        .toList();
+    options.sort((a, b) => a.key.compareTo(b.key));
+    return options.map((e) => e.value).toList();
   }
 
   /// POST registration — returns the new `registrationId`, needed for the
@@ -71,9 +90,10 @@ class RegistrationRepository with AnonymousSessionMixin {
   /// screen (per the reference UI) doesn't ask for it, and the confirmed
   /// Postman sample always sent it as an all-null object, so it's just
   /// sent that way unconditionally now rather than as a param.
-  /// [debitCardNumber] is new — the reference UI shows it as a required
-  /// field (the Postman sample happened to leave it null, but that
-  /// doesn't mean it's optional; matching the actual product screen here).
+  /// [debitCardNumber] — despite the reference UI marking this required,
+  /// confirmed via a live call that OBDX accepts registration without it;
+  /// sent as null when not provided rather than forced as a required
+  /// field client-side.
   Future<String> submit({
     required String firstName,
     required String lastName,
@@ -82,7 +102,7 @@ class RegistrationRepository with AnonymousSessionMixin {
     required String dateOfBirth, // 'yyyy-MM-dd'
     required String accountType, // e.g. 'CSA'
     required String accountNumber,
-    required String debitCardNumber,
+    String? debitCardNumber,
   }) async {
     final token = await getAnonymousToken();
 
@@ -112,7 +132,10 @@ class RegistrationRepository with AnonymousSessionMixin {
         'creditCardNameOnCard': null,
         'creditCardExpiryDate': null,
         'creditCardCVVNumber': null,
-        'debitCardNumber': debitCardNumber,
+        'debitCardNumber':
+            (debitCardNumber == null || debitCardNumber.isEmpty)
+                ? null
+                : debitCardNumber,
         'debitCardPin': null,
         'userGroups': [],
         'targetUnit': null,
