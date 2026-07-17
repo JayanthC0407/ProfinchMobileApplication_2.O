@@ -25,6 +25,16 @@ class _NotificationScreenState extends State<NotificationScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+
+    // Load real alerts/mails from the mailbox API as soon as the screen
+    // opens — the bell badge on the dashboard only has the lightweight
+    // count until now.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = context.read<AuthProvider>().currentUser?.id ?? '';
+      if (userId.isNotEmpty) {
+        context.read<NotificationProvider>().loadNotifications(userId);
+      }
+    });
   }
 
   @override
@@ -33,17 +43,18 @@ class _NotificationScreenState extends State<NotificationScreen>
     super.dispose();
   }
 
-  List<NotificationModel> _filtered(
-      List<NotificationModel> all, int tabIndex) {
+  List<NotificationModel> _filtered(List<NotificationModel> all, int tabIndex) {
     switch (tabIndex) {
       case 1:
         return all.where((n) => !n.isRead).toList();
       case 2:
         return all
-            .where((n) =>
-                n.type == NotificationType.transaction ||
-                n.type == NotificationType.upi ||
-                n.type == NotificationType.wallet)
+            .where(
+              (n) =>
+                  n.type == NotificationType.transaction ||
+                  n.type == NotificationType.upi ||
+                  n.type == NotificationType.wallet,
+            )
             .toList();
       case 3:
         return all.where((n) => n.type == NotificationType.offer).toList();
@@ -54,8 +65,7 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final userId =
-        context.read<AuthProvider>().currentUser?.id ?? '';
+    final userId = context.read<AuthProvider>().currentUser?.id ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -94,10 +104,13 @@ class _NotificationScreenState extends State<NotificationScreen>
               final list = provider.getByUserId(userId);
               return list.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.delete_sweep_outlined,
-                          color: Colors.white70),
+                      icon: const Icon(
+                        Icons.delete_sweep_outlined,
+                        color: Colors.white70,
+                      ),
                       tooltip: 'Clear all',
-                      onPressed: () => _confirmClearAll(context, provider, userId),
+                      onPressed: () =>
+                          _confirmClearAll(context, provider, userId),
                     )
                   : const SizedBox.shrink();
             },
@@ -128,7 +141,10 @@ class _NotificationScreenState extends State<NotificationScreen>
             controller: _tabController,
             children: List.generate(_tabs.length, (i) {
               final list = _filtered(all, i);
-              return _buildList(context, list, provider, userId);
+              return RefreshIndicator(
+                onRefresh: () => provider.loadNotifications(userId),
+                child: _buildList(context, list, provider, userId),
+              );
             }),
           );
         },
@@ -163,30 +179,37 @@ class _NotificationScreenState extends State<NotificationScreen>
 
     return ListView(
       padding: const EdgeInsets.all(16),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (today.isNotEmpty) ...[
           _sectionHeader(context, 'Today'),
-          ...today.map((n) => NotificationTile(
-                notification: n,
-                onTap: () => provider.markAsRead(n.id),
-                onDismiss: () => provider.deleteNotification(n.id),
-              )),
+          ...today.map(
+            (n) => NotificationTile(
+              notification: n,
+              onTap: () => provider.markAsRead(n.id),
+              onDismiss: () => provider.deleteNotification(n.id),
+            ),
+          ),
         ],
         if (yesterday.isNotEmpty) ...[
           _sectionHeader(context, 'Yesterday'),
-          ...yesterday.map((n) => NotificationTile(
-                notification: n,
-                onTap: () => provider.markAsRead(n.id),
-                onDismiss: () => provider.deleteNotification(n.id),
-              )),
+          ...yesterday.map(
+            (n) => NotificationTile(
+              notification: n,
+              onTap: () => provider.markAsRead(n.id),
+              onDismiss: () => provider.deleteNotification(n.id),
+            ),
+          ),
         ],
         if (older.isNotEmpty) ...[
           _sectionHeader(context, 'Earlier'),
-          ...older.map((n) => NotificationTile(
-                notification: n,
-                onTap: () => provider.markAsRead(n.id),
-                onDismiss: () => provider.deleteNotification(n.id),
-              )),
+          ...older.map(
+            (n) => NotificationTile(
+              notification: n,
+              onTap: () => provider.markAsRead(n.id),
+              onDismiss: () => provider.deleteNotification(n.id),
+            ),
+          ),
         ],
         const SizedBox(height: 16),
       ],
@@ -209,41 +232,57 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.notifications_off_outlined,
-              size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            'No notifications',
-            style: TextStyle(
-              fontSize: AppFontSize.medium(context),
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade400,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          // Needed so RefreshIndicator has something to pull against even
+          // when there's nothing to show yet.
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.notifications_off_outlined,
+                        size: 64, color: Colors.grey.shade300),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No notifications',
+                      style: TextStyle(
+                        fontSize: AppFontSize.medium(context),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'You\'re all caught up!',
+                      style: TextStyle(
+                        fontSize: AppFontSize.small(context),
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'You\'re all caught up!',
-            style: TextStyle(
-              fontSize: AppFontSize.small(context),
-              color: Colors.grey.shade400,
-            ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
   void _confirmClearAll(
-      BuildContext context, NotificationProvider provider, String userId) {
+    BuildContext context,
+    NotificationProvider provider,
+    String userId,
+  ) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Clear all notifications?',
           style: TextStyle(
@@ -261,8 +300,10 @@ class _NotificationScreenState extends State<NotificationScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
-                style: TextStyle(color: Colors.grey.shade600)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -273,7 +314,8 @@ class _NotificationScreenState extends State<NotificationScreen>
               backgroundColor: Colors.red.shade400,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Clear All'),
           ),

@@ -3,32 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 import 'package:profinch_mobile_application/core/network/api_exception.dart';
-import 'package:profinch_mobile_application/data/repositories/forgot_password_repository.dart';
+import 'package:profinch_mobile_application/data/repositories/forgot_username_repository.dart';
 import 'package:profinch_mobile_application/shared/widgets/background_wrapper.dart';
 import 'package:profinch_mobile_application/shared/widgets/logo.dart';
 import 'otp_screen.dart';
 
-/// Real OBDX flow: userId + dateOfBirth -> OTP -> done.
+/// Real OBDX flow: emailId + dateOfBirth -> OTP -> done.
 ///
-/// This used to collect an email and route to a ResetPasswordScreen at
-/// the end, but the real endpoint
-/// (`/digx-admin/sms/v1/credentials/forgotCredentials`) takes `userId` +
-/// `dateOfBirth`, not email — and its path strongly implies OBDX resets
-/// the credential and dispatches a new password via SMS/email itself
-/// rather than letting the app collect a new password. See
-/// ForgotPasswordRepository's doc for that caveat — flip this back to a
-/// reset-password screen only if you confirm the final response actually
-/// supports that.
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+/// Mirrors ForgotPasswordScreen's structure (same OTP-challenge pattern,
+/// same repository shape) — see ForgotUsernameRepository's doc for the
+/// same caveat about the final response likely just triggering an
+/// email/SMS with the username rather than returning it for display here.
+class ForgotUsernameScreen extends StatefulWidget {
+  const ForgotUsernameScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<ForgotUsernameScreen> createState() => _ForgotUsernameScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _userIdController = TextEditingController();
-  final _repository = ForgotPasswordRepository();
+class _ForgotUsernameScreenState extends State<ForgotUsernameScreen> {
+  final _emailController = TextEditingController();
+  final _repository = ForgotUsernameRepository();
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
@@ -36,7 +31,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   void dispose() {
-    _userIdController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -66,10 +61,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+
   Future<void> _handleSendOtp() async {
-    final userId = _userIdController.text.trim();
-    if (userId.isEmpty) {
-      setState(() => _error = 'Please enter your username');
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !_isValidEmail(email)) {
+      setState(() => _error = 'Please enter a valid email address');
       return;
     }
     if (_dateOfBirth == null) {
@@ -86,11 +84,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     bool otpSent = false;
     String? realError;
     try {
-      await _repository.initiate(userId: userId, dateOfBirth: dob);
-      // Reaching here without throwing would be unusual for this
-      // endpoint (see class doc) — OBDX signals "OTP sent" by throwing a
-      // requiresChallenge exception, so a clean return likely means no
-      // challenge was needed for some reason. Treat it as sent either way.
+      await _repository.initiate(emailId: email, dateOfBirth: dob);
       otpSent = true;
     } on ApiException catch (e) {
       if (e.requiresChallenge) {
@@ -118,7 +112,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onVerified: (otp) async {
             try {
               await _repository.confirm(
-                userId: userId,
+                emailId: email,
                 dateOfBirth: dob,
                 otp: otp,
               );
@@ -129,11 +123,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           },
           onResend: () async {
             try {
-              await _repository.initiate(userId: userId, dateOfBirth: dob);
+              await _repository.initiate(emailId: email, dateOfBirth: dob);
             } on ApiException catch (e) {
-              // requiresChallenge here just means "a new OTP was sent" —
-              // same as the first call. Anything else, let it surface via
-              // the OTP screen's own resend-failure handling.
               if (!e.requiresChallenge) rethrow;
             }
           },
@@ -154,7 +145,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Verified'),
         content: const Text(
-          'Your identity has been verified. A new password has been sent '
+          'Your identity has been verified. Your username has been sent '
           'to your registered mobile number/email.',
         ),
         actions: [
@@ -186,7 +177,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 32),
 
                   Text(
-                    'Forgot Password',
+                    'Forgot Username',
                     style: TextStyle(
                       fontSize: AppFontSize.xl(context),
                       fontWeight: FontWeight.w700,
@@ -195,7 +186,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enter your username and date of birth. We\'ll send a verification code to reset your password.',
+                    'Enter your registered email and date of birth. '
+                    'We\'ll send a verification code to look up your username.',
                     style: TextStyle(
                       fontSize: AppFontSize.body(context),
                       color: Colors.white.withValues(alpha: 0.75),
@@ -204,10 +196,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Username field
+                  // Email field
                   TextField(
-                    controller: _userIdController,
-                    keyboardType: TextInputType.text,
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     onChanged: (_) {
                       if (_error != null) setState(() => _error = null);
                     },
@@ -215,11 +207,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         fontSize: AppFontSize.body(context),
                         color: const Color(0xFF1A1A2E)),
                     decoration: InputDecoration(
-                      hintText: 'Username',
+                      hintText: 'Registered email address',
                       hintStyle: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: AppFontSize.body(context)),
-                      prefixIcon: const Icon(Icons.person_outline,
+                      prefixIcon: const Icon(Icons.email_outlined,
                           color: Colors.grey, size: 20),
                       filled: true,
                       fillColor: Colors.white,
