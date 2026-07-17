@@ -53,4 +53,8 @@ class AppRoutes {
 
   static const String analytics = '/analytics';
   
+  static const String serviceRequest = '/serviceRequest';
+  static const String raiseRequest = '/raiseRequest';
+  static const String serviceRequestSuccess = '/serviceRequestSuccess';
+  static const String trackRequest = '/trackRequest';
 }
