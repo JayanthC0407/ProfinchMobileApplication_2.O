@@ -73,7 +73,6 @@ class _ServiceRequestFormScreenState extends State<ServiceRequestFormScreen> {
 
     final provider = context.read<ServiceRequestProvider>();
     final success = await provider.submit(
-      definitionId: widget.definitionId,
       description: _descriptionController.text.trim(),
     );
 

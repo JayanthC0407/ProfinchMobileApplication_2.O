@@ -498,6 +498,8 @@ final List<MenuNode> _menuTree = [
   MenuNode(
     'Service Requests',
     icon: Icons.support_agent_outlined,
+    onNavigate: (context) =>
+        Navigator.pushNamed(context, AppRoutes.serviceRequest),
     children: [
       MenuNode(
         'Track Requests',
