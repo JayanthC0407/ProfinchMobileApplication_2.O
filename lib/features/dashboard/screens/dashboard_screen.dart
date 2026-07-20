@@ -80,7 +80,11 @@ class DashboardScreen extends StatelessWidget {
                         // hamburger menu
                         Builder(
                           builder: (context) => IconButton(
-                            icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                            icon: const Icon(
+                              Icons.menu,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () => Scaffold.of(context).openDrawer(),
@@ -311,7 +315,7 @@ class DashboardScreen extends StatelessWidget {
                       icon: Icons.bar_chart,
                       // ── CHANGED ── was: "Analytics"
                       title: t.qa_analytics,
-                     onTap: () {
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -322,8 +326,7 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     FeatureItem(
                       icon: Icons.calculate,
-                      title:
-                          t.qa_calculators,
+                      title: t.qa_calculators,
                       onTap: () =>
                           Navigator.pushNamed(context, AppRoutes.calculators),
                     ),
@@ -357,17 +360,12 @@ class DashboardScreen extends StatelessWidget {
                           AppRoutes.termDeposits,
                         ),
                       ),
-                      FeatureItem(
-                        icon: Icons.trending_up,
-                        title: t.qa_invest,
-                      ),
+                      FeatureItem(icon: Icons.trending_up, title: t.qa_invest),
                       FeatureItem(
                         icon: Icons.security,
                         title: t.qa_insurance,
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.insurance,
-                        ),
+                        onTap: () =>
+                            Navigator.pushNamed(context, AppRoutes.insurance),
                       ),
                       FeatureItem(
                         icon: Icons.people,
