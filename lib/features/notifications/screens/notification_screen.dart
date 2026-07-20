@@ -21,7 +21,10 @@ import 'notification_detail_screen.dart';
 /// Tapping any item now opens NotificationDetailScreen (full message
 /// view) instead of just marking read in place.
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({super.key});
+  final int initialTab;
+
+  const NotificationScreen({super.key, this.initialTab = 0})
+    : assert(initialTab >= 0 && initialTab < 3);
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -34,7 +37,11 @@ class _NotificationScreenState extends State<NotificationScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
 
     // Load real alerts/mails from the mailbox API as soon as the screen
     // opens — the bell badge on the dashboard only has the lightweight
@@ -67,9 +74,14 @@ class _NotificationScreenState extends State<NotificationScreen>
       .toList();
 
   void _openDetail(NotificationModel n) {
+    // markAsRead updates local state synchronously before its optional API
+    // request, so the row and unread counters react before the next page opens.
+    context.read<NotificationProvider>().markAsRead(n.id);
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NotificationDetailScreen(notification: n)),
+      MaterialPageRoute(
+        builder: (_) => NotificationDetailScreen(notification: n),
+      ),
     );
   }
 
@@ -114,8 +126,7 @@ class _NotificationScreenState extends State<NotificationScreen>
           child: Consumer<NotificationProvider>(
             builder: (context, provider, _) {
               final all = provider.getByUserId(userId);
-              final unreadAlerts =
-                  _alerts(all).where((n) => !n.isRead).length;
+              final unreadAlerts = _alerts(all).where((n) => !n.isRead).length;
 
               return TabBar(
                 controller: _tabController,
@@ -133,7 +144,11 @@ class _NotificationScreenState extends State<NotificationScreen>
                 ),
                 tabs: [
                   const Tab(text: 'Mails'),
-                  Tab(text: unreadAlerts > 0 ? 'Alerts ($unreadAlerts)' : 'Alerts'),
+                  Tab(
+                    text: unreadAlerts > 0
+                        ? 'Alerts ($unreadAlerts)'
+                        : 'Alerts',
+                  ),
                   const Tab(text: 'Notifications'),
                 ],
               );
@@ -151,7 +166,12 @@ class _NotificationScreenState extends State<NotificationScreen>
               _tabBody(context, _mails(all), provider, userId, 'Mails'),
               _tabBody(context, _alerts(all), provider, userId, 'Alerts'),
               _tabBody(
-                  context, _notifications(all), provider, userId, 'Notifications'),
+                context,
+                _notifications(all),
+                provider,
+                userId,
+                'Notifications',
+              ),
             ],
           );
         },
@@ -290,8 +310,11 @@ class _NotificationScreenState extends State<NotificationScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.inbox_outlined,
-                        size: 64, color: Colors.grey.shade300),
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 64,
+                      color: Colors.grey.shade300,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'No item in $tabLabel',
