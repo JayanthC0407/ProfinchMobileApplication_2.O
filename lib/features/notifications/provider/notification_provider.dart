@@ -6,8 +6,9 @@ import 'package:profinch_mobile_application/data/repositories/notification_repos
 class NotificationProvider extends ChangeNotifier {
   final NotificationRepository _repository = NotificationRepository();
 
-  final List<NotificationModel> _notifications =
-      List.from(DummyNotifications.notifications);
+  final List<NotificationModel> _notifications = List.from(
+    DummyNotifications.notifications,
+  );
 
   bool isLoading = false;
   String? loadError;
@@ -50,10 +51,26 @@ class NotificationProvider extends ChangeNotifier {
       final mailers = results[2];
 
       final fetched = <NotificationModel>[
-        ...alerts.map((j) => NotificationModel.fromAlertJson(j, userId: userId)),
+        ...alerts.map(
+          (j) => NotificationModel.fromAlertJson(j, userId: userId),
+        ),
         ...mails.map((j) => NotificationModel.fromMailJson(j, userId: userId)),
-        ...mailers.map((j) => NotificationModel.fromMailerJson(j, userId: userId)),
+        ...mailers.map(
+          (j) => NotificationModel.fromMailerJson(j, userId: userId),
+        ),
       ];
+
+      // Keep optimistic read state if this refresh started before an item was
+      // opened and returns with stale unread data.
+      final locallyReadServerIds = _notifications
+          .where((n) => n.userId == userId && n.isServerSourced && n.isRead)
+          .map((n) => n.id)
+          .toSet();
+      for (final notification in fetched) {
+        if (locallyReadServerIds.contains(notification.id)) {
+          notification.isRead = true;
+        }
+      }
 
       // Drop this user's previously-loaded server items, then re-insert
       // the fresh set — local (non-server) notifications are untouched.
@@ -96,9 +113,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   List<NotificationModel> getByUserId(String userId) {
-    final list = _notifications
-        .where((n) => n.userId == userId)
-        .toList()
+    final list = _notifications.where((n) => n.userId == userId).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
   }
@@ -126,6 +141,31 @@ class NotificationProvider extends ChangeNotifier {
     if (notification.isRead) return;
 
     notification.isRead = true;
+
+    // The dashboard badge may still be backed by the lightweight mailbox
+    // count endpoint. Keep that cached total in sync with this optimistic
+    // local update so the badge decreases immediately when an item opens.
+    if (notification.isServerSourced && _serverUnreadCounts != null) {
+      final messageType = notification.rawMessageType;
+      if (messageType != null && (_serverUnreadCounts![messageType] ?? 0) > 0) {
+        _serverUnreadCounts![messageType] =
+            _serverUnreadCounts![messageType]! - 1;
+      } else {
+        // Be tolerant of an API message-type mismatch: the count response
+        // and item response are not guaranteed to use identical keys.
+        String? fallbackType;
+        for (final entry in _serverUnreadCounts!.entries) {
+          if (entry.value > 0) {
+            fallbackType = entry.key;
+            break;
+          }
+        }
+        if (fallbackType != null) {
+          _serverUnreadCounts![fallbackType] =
+              _serverUnreadCounts![fallbackType]! - 1;
+        }
+      }
+    }
     notifyListeners();
 
     if (notification.serverSource == 'alert') {
@@ -136,6 +176,9 @@ class NotificationProvider extends ChangeNotifier {
           alertId: notification.serverMessageIdValue!,
           displayValue: notification.serverMessageIdDisplayValue ?? '',
         );
+        // Re-fetch the authoritative mailbox count after the alert is marked
+        // read so the dashboard badge reflects the backend value as well.
+        await loadUnreadCount(notification.userId);
       } catch (_) {
         // See method doc — intentionally not reverting local state.
       }
@@ -143,18 +186,16 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> markAllAsRead(String userId) async {
-    final toMark = _notifications.where(
-      (n) => n.userId == userId && !n.isRead,
-    ).toList();
+    final toMark = _notifications
+        .where((n) => n.userId == userId && !n.isRead)
+        .toList();
 
     for (final n in toMark) {
       n.isRead = true;
     }
     notifyListeners();
 
-    final serverAlerts = toMark.where(
-      (n) => n.serverSource == 'alert',
-    );
+    final serverAlerts = toMark.where((n) => n.serverSource == 'alert');
     for (final n in serverAlerts) {
       try {
         await _repository.markAlertAsRead(
@@ -186,11 +227,12 @@ class NotificationProvider extends ChangeNotifier {
       NotificationType.wallet,
     };
 
-    const promoTypes = {
-      NotificationType.offer,
-    };
+    const promoTypes = {NotificationType.offer};
 
-    if (!transactionAlertsEnabled && transactionTypes.contains(notification.type)) return;
+    if (!transactionAlertsEnabled &&
+        transactionTypes.contains(notification.type)) {
+      return;
+    }
     if (!promoAlertsEnabled && promoTypes.contains(notification.type)) return;
 
     _notifications.insert(0, notification);

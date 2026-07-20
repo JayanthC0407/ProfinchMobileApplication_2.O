@@ -13,7 +13,10 @@ import '../widgets/card_settings_tile.dart';
 import 'package:profinch_mobile_application/core/routes/app_routes.dart';
 
 class CardsScreen extends StatefulWidget {
-  const CardsScreen({super.key});
+  final int initialTab;
+
+  const CardsScreen({super.key, this.initialTab = 0})
+    : assert(initialTab >= 0 && initialTab < 2);
 
   @override
   State<CardsScreen> createState() => _CardsScreenState();
@@ -26,7 +29,11 @@ class _CardsScreenState extends State<CardsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
   }
 
   @override
@@ -43,10 +50,7 @@ class _CardsScreenState extends State<CardsScreen>
         backgroundColor: AppColors.primaryDark,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.light),
-        title: Text(
-          'My Cards',
-          style: AppTextStyles.whiteTitle(context),
-        ),
+        title: Text('My Cards', style: AppTextStyles.whiteTitle(context)),
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: AppColors.light),
@@ -255,7 +259,7 @@ class _CardsScreenState extends State<CardsScreen>
               Text(
                 '₹${card.atmLimit.toStringAsFixed(0)}',
                 style: TextStyle(
-                  fontSize: AppFontSize.large(context), 
+                  fontSize: AppFontSize.large(context),
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
@@ -296,7 +300,10 @@ class _CardsScreenState extends State<CardsScreen>
                 children: [
                   Text(
                     'Reward Points',
-                    style: TextStyle(fontSize: AppFontSize.body(context), color: AppColors.light.withValues(alpha: 0.7)),
+                    style: TextStyle(
+                      fontSize: AppFontSize.body(context),
+                      color: AppColors.light.withValues(alpha: 0.7),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -310,7 +317,10 @@ class _CardsScreenState extends State<CardsScreen>
                   const SizedBox(height: 2),
                   Text(
                     '≈ ₹${(card.rewardPoints / 10).toStringAsFixed(0)} cashback value',
-                    style: TextStyle(fontSize: AppFontSize.small(context), color: AppColors.light.withValues(alpha: 0.54)),
+                    style: TextStyle(
+                      fontSize: AppFontSize.small(context),
+                      color: AppColors.light.withValues(alpha: 0.54),
+                    ),
                   ),
                 ],
               ),
@@ -441,7 +451,10 @@ class _CardsScreenState extends State<CardsScreen>
             children: [
               Text(
                 'Set ATM Limit',
-                style: TextStyle(fontSize: AppFontSize.large(context), fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontSize: AppFontSize.large(context),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 20),
               ...limits.map(

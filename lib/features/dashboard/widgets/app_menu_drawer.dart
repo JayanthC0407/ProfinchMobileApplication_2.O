@@ -5,6 +5,11 @@ import '../../../core/constants/colors.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../accounts/provider/account_provider.dart';
 import '../../auth/provider/auth_provider.dart';
+import '../../cards/screens/card_screen.dart';
+import '../../notifications/screens/notification_screen.dart';
+import '../../profile/screens/change_password_screen.dart';
+import '../../profile/screens/help_support_screen.dart';
+import '../../profile/screens/security_settings_screen.dart';
 import '../../upi/provider/upi_provider.dart';
 import '../../upi/screens/upi_home_screen.dart';
 
@@ -37,6 +42,41 @@ void _openUpi(BuildContext context) {
         child: const UpiHomeScreen(),
       ),
     ),
+  );
+}
+
+void _openCardsTab(BuildContext context, int tab) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => CardsScreen(initialTab: tab)),
+  );
+}
+
+void _openMailboxTab(BuildContext context, int tab) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => NotificationScreen(initialTab: tab)),
+  );
+}
+
+void _openSecuritySettings(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const SecuritySettingsScreen()),
+  );
+}
+
+void _openChangePassword(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+  );
+}
+
+void _openHelp(BuildContext context) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
   );
 }
 
@@ -213,11 +253,11 @@ final List<MenuNode> _menuTree = [
     children: [
       MenuNode(
         'Credit Cards',
-        onNavigate: (context) => Navigator.pushNamed(context, AppRoutes.cards),
+        onNavigate: (context) => _openCardsTab(context, 1),
       ),
       MenuNode(
         'Credit Card Details',
-        onNavigate: (context) => Navigator.pushNamed(context, AppRoutes.cards),
+        onNavigate: (context) => _openCardsTab(context, 1),
       ),
       MenuNode(
         'Transactions',
@@ -455,10 +495,21 @@ final List<MenuNode> _menuTree = [
     ],
   ),
 
-  const MenuNode(
+  MenuNode(
     'Service Requests',
     icon: Icons.support_agent_outlined,
-    children: [MenuNode('Track Requests'), MenuNode('Raise a New Request')],
+    children: [
+      MenuNode(
+        'Track Requests',
+        onNavigate: (context) =>
+            Navigator.pushNamed(context, AppRoutes.trackRequest),
+      ),
+      MenuNode(
+        'Raise a New Request',
+        onNavigate: (context) =>
+            Navigator.pushNamed(context, AppRoutes.raiseRequest),
+      ),
+    ],
   ),
 
   MenuNode(
@@ -483,11 +534,7 @@ final List<MenuNode> _menuTree = [
                 Navigator.pushNamed(context, AppRoutes.accounts),
           ),
           const MenuNode('Third Party Applications'),
-          MenuNode(
-            'Security & Login',
-            onNavigate: (context) =>
-                Navigator.pushNamed(context, AppRoutes.profile),
-          ),
+          MenuNode('Security & Login', onNavigate: _openSecuritySettings),
           MenuNode(
             'Themes',
             onNavigate: (context) =>
@@ -504,8 +551,7 @@ final List<MenuNode> _menuTree = [
       MenuNode(
         'Change Password',
         icon: Icons.lock_outline,
-        onNavigate: (context) =>
-            Navigator.pushNamed(context, AppRoutes.profile),
+        onNavigate: _openChangePassword,
       ),
       const MenuNode('My Limits', icon: Icons.speed_outlined),
       const MenuNode('Session Summary', icon: Icons.access_time_outlined),
@@ -517,12 +563,11 @@ final List<MenuNode> _menuTree = [
     'Mailbox',
     icon: Icons.mail_outline,
     children: [
-      const MenuNode('Mails'),
-      const MenuNode('Alerts'),
+      MenuNode('Mails', onNavigate: (context) => _openMailboxTab(context, 0)),
+      MenuNode('Alerts', onNavigate: (context) => _openMailboxTab(context, 1)),
       MenuNode(
         'Notifications',
-        onNavigate: (context) =>
-            Navigator.pushNamed(context, AppRoutes.notifications),
+        onNavigate: (context) => _openMailboxTab(context, 2),
       ),
     ],
   ),
@@ -597,17 +642,20 @@ final List<MenuNode> _menuTree = [
 
   const MenuNode('Leave Feedback', icon: Icons.chat_bubble_outline),
   const MenuNode('ATM & Branch Locator', icon: Icons.location_on_outlined),
-  MenuNode(
-    'Help',
-    icon: Icons.help_outline,
-    onNavigate: (context) => Navigator.pushNamed(context, AppRoutes.profile),
-  ),
+  MenuNode('Help', icon: Icons.help_outline, onNavigate: _openHelp),
   const MenuNode('About', icon: Icons.info_outline),
   const MenuNode('Logout', icon: Icons.logout),
 ];
 
-class AppMenuDrawer extends StatelessWidget {
+class AppMenuDrawer extends StatefulWidget {
   const AppMenuDrawer({super.key});
+
+  @override
+  State<AppMenuDrawer> createState() => _AppMenuDrawerState();
+}
+
+class _AppMenuDrawerState extends State<AppMenuDrawer> {
+  int? _expandedTopLevelIndex;
 
   static const String _logoutLabel = 'Logout';
 
@@ -656,6 +704,12 @@ class AppMenuDrawer extends StatelessWidget {
                     child: _MenuNodeTile(
                       node: _menuTree[index],
                       depth: 0,
+                      topLevelExpanded: _expandedTopLevelIndex == index,
+                      onTopLevelToggle: (expanded) {
+                        setState(() {
+                          _expandedTopLevelIndex = expanded ? index : null;
+                        });
+                      },
                       onLeafTap: _onLeafTap,
                     ),
                   );
@@ -672,11 +726,15 @@ class AppMenuDrawer extends StatelessWidget {
 class _MenuNodeTile extends StatefulWidget {
   final MenuNode node;
   final int depth;
+  final bool? topLevelExpanded;
+  final ValueChanged<bool>? onTopLevelToggle;
   final void Function(BuildContext, String) onLeafTap;
 
   const _MenuNodeTile({
     required this.node,
     required this.depth,
+    this.topLevelExpanded,
+    this.onTopLevelToggle,
     required this.onLeafTap,
   });
 
@@ -687,10 +745,22 @@ class _MenuNodeTile extends StatefulWidget {
 class _MenuNodeTileState extends State<_MenuNodeTile> {
   bool _expanded = false;
 
+  @override
+  void didUpdateWidget(covariant _MenuNodeTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.depth == 0 && widget.topLevelExpanded == false && _expanded) {
+      _expanded = false;
+    }
+  }
+
   void _toggleExpanded() {
+    final expanded = !_expanded;
     setState(() {
-      _expanded = !_expanded;
+      _expanded = expanded;
     });
+    if (widget.depth == 0) {
+      widget.onTopLevelToggle?.call(expanded);
+    }
   }
 
   void _navigate(BuildContext context) {
@@ -700,10 +770,7 @@ class _MenuNodeTileState extends State<_MenuNodeTile> {
     final navigator = Navigator.of(context);
 
     navigator.pop();
-
-    Future.microtask(() {
-      navigation(navigator.context);
-    });
+    navigation(navigator.context);
   }
 
   @override
