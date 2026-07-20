@@ -79,6 +79,13 @@ class ApiEndpoints {
       '/digx-common/sr/v1/servicerequest/products/$productId/categories';
   static const String serviceRequestSubmit = '/digx-common/sr/v1/servicerequest';
   static const String feedbackTemplate = '/digx-common/feedback/v1/feedback/template';
+  // Track Request filter form: products + status enum fire together on
+  // open; picking a product fires serviceRequestCategories(product)
+  // (reused from above — same endpoint, driven by the picked product
+  // instead of the "Raise" flow's literal "Product" placeholder); Apply
+  // fires a GET on the same serviceRequestSubmit path with query params.
+  static const String serviceRequestProducts = '/digx-common/sr/v1/servicerequest/products';
+  static const String serviceRequestStatusEnum = '/digx-common/sr/v1/enumerations/srStatus';
 
   // ── Content (icons/images referenced by id, e.g. SR infoNote.icon) ──
   static String contentById(String contentId) =>

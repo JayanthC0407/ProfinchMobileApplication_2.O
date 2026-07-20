@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:profinch_mobile_application/data/models/content_model.dart';
 import 'package:profinch_mobile_application/data/models/service_request_definition_model.dart';
 import 'package:profinch_mobile_application/data/models/service_request_submission_model.dart';
+import 'package:profinch_mobile_application/data/repositories/service_request_list_item_model.dart';
+import 'package:profinch_mobile_application/data/repositories/service_request_lookup_models.dart';
 import 'package:profinch_mobile_application/data/repositories/service_request_repository.dart';
 
 class ServiceRequestProvider extends ChangeNotifier {
@@ -82,17 +84,25 @@ class ServiceRequestProvider extends ChangeNotifier {
   /// the success screen, matching how it behaves in the base app (it's
   /// clearly a secondary, non-critical call fired after the real work is
   /// already done).
-  Future<bool> submit({
-    required String definitionId,
-    required String description,
-  }) async {
+  /// Uses [selectedDefinition] (already loaded by [loadDefinitionDetail]
+  /// before the user ever reaches a Submit button) rather than taking a
+  /// separate id, since the repository now needs `priorityType` off the
+  /// definition too — see `ServiceRequestRepository.submitServiceRequest`.
+  Future<bool> submit({required String description}) async {
+    final definition = selectedDefinition;
+    if (definition == null) {
+      submitError = 'No service selected — try going back and reopening it.';
+      notifyListeners();
+      return false;
+    }
+
     isSubmitting = true;
     submitError = null;
     notifyListeners();
 
     try {
       submissionResult = await _repository.submitServiceRequest(
-        definitionId: definitionId,
+        definition: definition,
         description: description,
       );
 
@@ -121,4 +131,96 @@ class ServiceRequestProvider extends ChangeNotifier {
     submitError = null;
     notifyListeners();
   }
+  // ── Track Request ────────────────────────────────────────────
+
+  List<ServiceRequestProductModel> trackProducts = [];
+  List<ServiceRequestStatusOption> trackStatuses = [];
+  bool isLoadingTrackFilters = false;
+  String? trackFiltersLoadError;
+
+  /// Mirrors what fires when Track Request opens: products + status enum
+  /// together, not sequentially.
+  Future<void> loadTrackFilters() async {
+    isLoadingTrackFilters = true;
+    trackFiltersLoadError = null;
+    notifyListeners();
+
+    try {
+      final results = await Future.wait([
+        _repository.getProducts(),
+        _repository.getStatuses(),
+      ]);
+      trackProducts = results[0] as List<ServiceRequestProductModel>;
+      trackStatuses = results[1] as List<ServiceRequestStatusOption>;
+    } catch (e) {
+      trackFiltersLoadError = e.toString();
+    } finally {
+      isLoadingTrackFilters = false;
+      notifyListeners();
+    }
+  }
+
+  List<ServiceRequestCategoryModel> trackCategories = [];
+  bool isLoadingTrackCategories = false;
+  String? trackCategoriesLoadError;
+
+  /// Fired when the user picks a product on the filter form — repopulates
+  /// the Category Name dropdown for that product.
+  Future<void> loadCategoriesForProduct(String product) async {
+    trackCategories = [];
+    isLoadingTrackCategories = true;
+    trackCategoriesLoadError = null;
+    notifyListeners();
+
+    try {
+      trackCategories = await _repository.getCategoriesForProduct(product);
+    } catch (e) {
+      trackCategoriesLoadError = e.toString();
+    } finally {
+      isLoadingTrackCategories = false;
+      notifyListeners();
+    }
+  }
+
+  List<ServiceRequestListItemModel> trackResults = [];
+  bool isSearchingTrackResults = false;
+  String? trackSearchError;
+
+  /// True only after Apply has actually been pressed at least once —
+  /// distinguishes "haven't searched yet" from "searched, found nothing"
+  /// so the UI can show the right empty state for each.
+  bool hasSearchedTrackRequests = false;
+
+  Future<void> searchTrackRequests({
+    required String categoryType,
+    required String product,
+    required String status,
+  }) async {
+    isSearchingTrackResults = true;
+    trackSearchError = null;
+    notifyListeners();
+
+    try {
+      trackResults = await _repository.searchServiceRequests(
+        categoryType: categoryType,
+        product: product,
+        status: status,
+      );
+      hasSearchedTrackRequests = true;
+    } catch (e) {
+      trackSearchError = e.toString();
+    } finally {
+      isSearchingTrackResults = false;
+      notifyListeners();
+    }
+  }
+
+  void resetTrackFilters() {
+    trackCategories = [];
+    trackResults = [];
+    hasSearchedTrackRequests = false;
+    trackSearchError = null;
+    notifyListeners();
+  }
+
 }

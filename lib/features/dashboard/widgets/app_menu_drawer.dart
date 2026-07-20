@@ -455,10 +455,23 @@ final List<MenuNode> _menuTree = [
     ],
   ),
 
-  const MenuNode(
+  MenuNode(
     'Service Requests',
     icon: Icons.support_agent_outlined,
-    children: [MenuNode('Track Requests'), MenuNode('Raise a New Request')],
+    onNavigate: (context) =>
+        Navigator.pushNamed(context, AppRoutes.serviceRequest),
+    children: [
+      MenuNode(
+        'Track Requests',
+        onNavigate: (context) =>
+            Navigator.pushNamed(context, AppRoutes.trackRequest),
+      ),
+      MenuNode(
+        'Raise a New Request',
+        onNavigate: (context) =>
+            Navigator.pushNamed(context, AppRoutes.raiseRequest),
+      ),
+    ],
   ),
 
   MenuNode(
