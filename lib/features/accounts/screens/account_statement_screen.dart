@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:profinch_mobile_application/core/constants/colors.dart';
@@ -10,7 +9,6 @@ import 'package:profinch_mobile_application/data/repositories/common_repository.
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'dart:typed_data';
 import 'package:file_saver/file_saver.dart';
@@ -256,22 +254,11 @@ class _AccountStatementScreenState extends State<AccountStatementScreen> {
       final filename =
           'statement_${widget.account.accountNumber}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
-      if (kIsWeb) {
-        final blob = html.Blob([pdfBytes], 'application/pdf');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-
-        html.AnchorElement(href: url)
-          ..setAttribute('download', filename)
-          ..click();
-
-        html.Url.revokeObjectUrl(url);
-      } else {
-        await FileSaver.instance.saveFile(
-          name: filename.replaceAll('.pdf', ''),
-          bytes: Uint8List.fromList(pdfBytes),
-          ext: 'pdf',
-        );
-      }
+await FileSaver.instance.saveFile(
+  name: filename.replaceAll('.pdf', ''),
+  bytes: Uint8List.fromList(pdfBytes),
+  ext: 'pdf',
+);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

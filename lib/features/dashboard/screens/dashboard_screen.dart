@@ -21,7 +21,6 @@ import 'package:profinch_mobile_application/features/Transactions/provider/trans
 import 'package:profinch_mobile_application/features/Transactions/widgets/transaction_tile_widget.dart';
 import 'package:profinch_mobile_application/features/Transactions/screens/transaction_history_screen.dart';
 import 'package:profinch_mobile_application/features/notifications/provider/notification_provider.dart';
-import 'package:profinch_mobile_application/core/constants/colors.dart';
 
 import 'package:profinch_mobile_application/core/l10n/app_localizations.dart';
 // ─────────────────────────────────────────────────────────────────
