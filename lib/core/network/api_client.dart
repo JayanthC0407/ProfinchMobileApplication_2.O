@@ -193,6 +193,7 @@ class ApiClient {
         }
       }
       throw ApiException(
+        // ignore: prefer_interpolation_to_compose_strings
         'Verification required.' + (code != null ? ' ($code)' : ''),
         statusCode: response.statusCode,
         requiresChallenge: true,

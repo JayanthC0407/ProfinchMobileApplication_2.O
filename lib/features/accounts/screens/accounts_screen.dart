@@ -3,6 +3,7 @@ import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/text_styles.dart';
 import 'package:profinch_mobile_application/core/utils/currency_formatter.dart';
 import 'package:profinch_mobile_application/core/utils/responsive_text.dart';
+// ignore: unused_import
 import 'package:profinch_mobile_application/data/models/account_model.dart';
 import 'package:provider/provider.dart';
 

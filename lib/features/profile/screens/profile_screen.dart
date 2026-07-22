@@ -1,9 +1,10 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:profinch_mobile_application/core/constants/colors.dart';
 import 'package:profinch_mobile_application/core/constants/fonts_size.dart';
 import 'package:profinch_mobile_application/core/routes/app_routes.dart';
-import 'package:profinch_mobile_application/data/models/account_model.dart';
 import 'package:profinch_mobile_application/features/accounts/provider/account_provider.dart';
 import 'package:provider/provider.dart';
 import '../../auth/provider/auth_provider.dart';
@@ -14,7 +15,6 @@ import 'edit_profile_screen.dart';
 import 'security_settings_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'help_support_screen.dart';
-import 'package:profinch_mobile_application/features/notifications/provider/notification_provider.dart';
 import 'package:profinch_mobile_application/features/profile/provider/profile_provider.dart';
 
 // ── NEW (1) ── add these two imports ─────────────────────────────
