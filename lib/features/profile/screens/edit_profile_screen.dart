@@ -9,6 +9,7 @@ import '../../accounts/provider/account_provider.dart';
 import '../../../data/repositories/user_preferences_repository.dart';
 import '../../../data/models/user_preferences_model.dart';
 
+// ignore: unused_import
 import 'dart:io';    
 import 'package:image_picker/image_picker.dart';
 
@@ -33,6 +34,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   /// Fetched by [_loadPrimaryAccountPickerData], mutated and PUT back by
   /// [_save] via [UserPreferencesModel.copyWithPrimaryAccount].
   UserPreferencesModel? _fetchedPreferences;
+  // ignore: unused_field
   bool _isLoadingPreferences = false;
   String? _preferencesLoadError;
 
@@ -146,6 +148,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     authProvider.updateUser(updatedUser);
+    // ignore: use_build_context_synchronously
     Provider.of<DashboardProvider>(context, listen: false)
         .resetToPrimary(selectedPrimaryAccountId!);
 

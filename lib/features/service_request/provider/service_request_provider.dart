@@ -33,6 +33,7 @@ class ServiceRequestProvider extends ChangeNotifier {
         _repository.getCategories('Product'),
       ]);
       definitions = results[0] as List<ServiceRequestDefinitionModel>;
+      // ignore: unnecessary_cast
       categories = results[1] as List<dynamic>;
     } catch (e) {
       definitionsLoadError = e.toString();
